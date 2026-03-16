@@ -2,28 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SwordsBattle.io | Green Arena</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SwordsBattle.io | Combat Edition</title>
     <style>
-        body, html { margin: 0; padding: 0; overflow: hidden; background: #2d3436; font-family: 'Arial', sans-serif; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #1b5e20; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
+        
         #ui {
-            position: absolute; top: 20px; left: 20px; color: white;
-            background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; 
-            pointer-events: none; border: 1px solid rgba(255,255,255,0.1);
+            position: absolute; top: 10px; left: 10px; color: white;
+            background: rgba(0,0,0,0.5); padding: 12px; border-radius: 12px; 
+            pointer-events: none; border: 2px solid #2e7d32; z-index: 10;
         }
-        .key { background: #444; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+
+        /* Mobile Controls */
+        .touch-ctrl {
+            position: absolute; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.4);
+            display: none; user-select: none; z-index: 20;
+        }
+        #joystick-base { bottom: 40px; left: 40px; width: 100px; height: 100px; }
+        #joystick-stick {
+            position: absolute; top: 25px; left: 25px; width: 50px; height: 50px;
+            background: rgba(255, 255, 255, 0.6); border-radius: 50%;
+        }
+        #dash-btn { bottom: 130px; right: 40px; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
+        #atk-btn { bottom: 40px; right: 40px; width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; background: rgba(255, 0, 0, 0.3); }
     </style>
 </head>
 <body>
 
     <div id="ui">
-        <h2 style="margin:0; color: #ffeaa7;">SwordsBattle.io</h2>
+        <h2 style="margin:0; font-size: 18px; color: #a5d6a7;">SwordsBattle.io</h2>
         <div id="score">Kills: 0</div>
-        <div style="margin-top:5px; font-size: 0.8em;">
-            <span class="key">WASD</span> Move | <span class="key">SPACE</span> Dash | <span class="key">MOUSE</span> Aim
-        </div>
     </div>
+
+    <div id="joystick-base" class="touch-ctrl"><div id="joystick-stick"></div></div>
+    <div id="dash-btn" class="touch-ctrl">DASH</div>
+    <div id="atk-btn" class="touch-ctrl">SWING</div>
 
     <canvas id="gameCanvas"></canvas>
 
@@ -31,191 +46,198 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+        const joyBase = document.getElementById('joystick-base'), joyStick = document.getElementById('joystick-stick');
+        const dashBtn = document.getElementById('dash-btn'), atkBtn = document.getElementById('atk-btn');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         let kills = 0;
-        const mouse = { x: 0, y: 0 };
+        const mouse = { x: canvas.width/2, y: canvas.height/2 };
         const keys = {};
-        
+        let isTouch = false;
+        const joyState = { x: 0, y: 0, active: false };
+
         // Game Constants
-        const BOT_COUNT = 5; // Reduced bots
-        const PLAYER_RADIUS = 22;
-        const DASH_SPEED = 15;
-        const DASH_DURATION = 10; // frames
+        const BOT_COUNT = 4; 
+        const RADIUS = 24;
+        const SWING_SPEED = 0.2; // Radians per frame
 
-        const player = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            radius: PLAYER_RADIUS,
-            color: '#0984e3',
-            speed: 4,
-            dashTimer: 0,
-            isDashing: false
-        };
-
-        const bots = [];
-        const colors = ['#d63031', '#e17055', '#fdcb6e', '#6c5ce7'];
-
-        function createBot() {
+        function createEntity(x, y, color, isPlayer = false) {
             return {
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                radius: PLAYER_RADIUS,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                speed: 2,
-                angle: Math.random() * Math.PI * 2,
-                vx: 0, vy: 0,
-                changeDirTimer: 0
+                x: x || Math.random() * canvas.width,
+                y: y || Math.random() * canvas.height,
+                radius: RADIUS,
+                color: color,
+                hp: 100,
+                maxHp: 100,
+                speed: isPlayer ? 4.5 : 2.2,
+                angle: 0,
+                targetAngle: 0,
+                isPlayer: isPlayer,
+                // Combat states
+                isAttacking: false,
+                swingAngle: 0,
+                dashTimer: 0,
+                dashCooldown: 0,
+                changeTimer: 0
             };
         }
 
-        for (let i = 0; i < BOT_COUNT; i++) bots.push(createBot());
+        const player = createEntity(canvas.width/2, canvas.height/2, '#2196f3', true);
+        const bots = [];
+        const colors = ['#f44336', '#ff9800', '#9c27b0', '#ffeb3b'];
+        for (let i = 0; i < BOT_COUNT; i++) bots.push(createEntity(null, null, colors[i]));
 
+        // --- Inputs ---
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
-            if (e.code === 'Space' && !player.isDashing) {
-                player.isDashing = true;
-                player.dashTimer = DASH_DURATION;
-            }
+            if (e.code === 'Space') triggerDash(player);
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
-        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+        window.addEventListener('mousedown', () => { if(!isTouch) triggerAttack(player); });
+        window.addEventListener('mousemove', e => { if(!isTouch) { mouse.x = e.clientX; mouse.y = e.clientY; } });
 
-        // Physics: Prevent circles from overlapping
-        function resolveCollision(a, b) {
-            const dx = b.x - a.x;
-            const dy = b.y - a.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = a.radius + b.radius;
+        // Touch handling
+        window.addEventListener('touchstart', () => {
+            isTouch = true;
+            [joyBase, dashBtn, atkBtn].forEach(el => el.style.display = 'flex');
+        }, {once: true});
 
-            if (distance < minDistance) {
-                const overlap = minDistance - distance;
-                const nx = dx / distance; // Normal X
-                const ny = dy / distance; // Normal Y
-                
-                // Push them apart equally
-                a.x -= nx * (overlap / 2);
-                a.y -= ny * (overlap / 2);
-                b.x += nx * (overlap / 2);
-                b.y += ny * (overlap / 2);
+        joyBase.addEventListener('touchstart', () => joyState.active = true);
+        window.addEventListener('touchmove', e => {
+            if (!joyState.active) return;
+            const touch = e.touches[0];
+            const rect = joyBase.getBoundingClientRect();
+            const dx = touch.clientX - (rect.left + rect.width/2);
+            const dy = touch.clientY - (rect.top + rect.height/2);
+            const dist = Math.min(50, Math.sqrt(dx*dx + dy*dy));
+            const angle = Math.atan2(dy, dx);
+            joyState.x = (Math.cos(angle) * dist) / 50;
+            joyState.y = (Math.sin(angle) * dist) / 50;
+            joyStick.style.transform = `translate(${joyState.x * 50}px, ${joyState.y * 50}px)`;
+        });
+        window.addEventListener('touchend', () => { joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = `translate(0,0)`; });
+        dashBtn.addEventListener('touchstart', e => { e.preventDefault(); triggerDash(player); });
+        atkBtn.addEventListener('touchstart', e => { e.preventDefault(); triggerAttack(player); });
+
+        function triggerDash(e) { if (e.dashCooldown <= 0) { e.dashTimer = 12; e.dashCooldown = 60; } }
+        function triggerAttack(e) { if (!e.isAttacking) { e.isAttacking = true; e.swingAngle = -1.2; } }
+
+        function handleHitboxes(a, b) {
+            const dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx*dx + dy*dy);
+            const minGap = a.radius + b.radius;
+            if (dist < minGap) {
+                const overlap = minGap - dist;
+                const nx = dx/dist, ny = dy/dist;
+                a.x -= nx * (overlap/2); a.y -= ny * (overlap/2);
+                b.x += nx * (overlap/2); b.y += ny * (overlap/2);
             }
         }
 
-        function drawEntity(entity, isPlayer) {
+        function drawEntity(e) {
             ctx.save();
-            ctx.translate(entity.x, entity.y);
-            let angle = isPlayer ? Math.atan2(mouse.y - entity.y, mouse.x - entity.x) : entity.angle;
-            ctx.rotate(angle);
-
-            // Tech Sword Design
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = isPlayer ? '#00fbff' : '#ff7675';
+            ctx.translate(e.x, e.y);
             
-            // Blade (Gradient/Tech look)
-            ctx.fillStyle = '#dfe6e9';
-            ctx.fillRect(20, -4, 45, 8); 
-            ctx.fillStyle = isPlayer ? '#00d2d3' : '#ff7675'; // Inner glow line
-            ctx.fillRect(25, -1, 35, 2);
+            // Health Bar
+            const barW = 40;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-barW/2, -e.radius - 15, barW, 6);
+            ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff5252';
+            ctx.fillRect(-barW/2, -e.radius - 15, barW * (e.hp/e.maxHp), 6);
 
-            // Crossguard
-            ctx.fillStyle = '#2d3436';
-            ctx.fillRect(20, -12, 6, 24);
+            // Set Facing Angle
+            let faceAngle = e.isPlayer && !isTouch ? Math.atan2(mouse.y - e.y, mouse.x - e.x) : e.angle;
+            ctx.rotate(faceAngle);
 
-            ctx.shadowBlur = 0; // Reset shadow for body
+            // Sword + Swing Animation
+            ctx.save();
+            if (e.isAttacking) {
+                ctx.rotate(e.swingAngle);
+                e.swingAngle += SWING_SPEED;
+                if (e.swingAngle > 1.2) e.isAttacking = false;
+            }
+            
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = e.isPlayer ? '#00e5ff' : '#ff1744';
+            ctx.fillStyle = '#f5f5f5'; ctx.fillRect(22, -4, 48, 8); 
+            ctx.fillStyle = e.isPlayer ? '#00b0ff' : '#d50000'; ctx.fillRect(28, -1, 38, 2);
+            ctx.fillStyle = '#37474f'; ctx.fillRect(22, -14, 6, 28);
+            ctx.restore();
 
             // Body
-            ctx.beginPath();
-            ctx.arc(0, 0, entity.radius, 0, Math.PI * 2);
-            ctx.fillStyle = entity.color;
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            
+            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+            ctx.fillStyle = e.color; ctx.fill();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
             ctx.restore();
         }
 
         function update() {
-            // Player Movement & Dash
-            let currentSpeed = player.isDashing ? DASH_SPEED : player.speed;
-            
-            if (keys['KeyW']) player.y -= currentSpeed;
-            if (keys['KeyS']) player.y += currentSpeed;
-            if (keys['KeyA']) player.x -= currentSpeed;
-            if (keys['KeyD']) player.x += currentSpeed;
+            // Player Movement
+            let pSpeed = player.dashTimer > 0 ? 14 : player.speed;
+            if (player.dashTimer > 0) player.dashTimer--;
+            if (player.dashCooldown > 0) player.dashCooldown--;
 
-            if (player.isDashing) {
-                player.dashTimer--;
-                if (player.dashTimer <= 0) player.isDashing = false;
+            if (isTouch) {
+                player.x += joyState.x * pSpeed; player.y += joyState.y * pSpeed;
+                if(joyState.active) player.angle = Math.atan2(joyState.y, joyState.x);
+            } else {
+                if (keys['KeyW']) player.y -= pSpeed; if (keys['KeyS']) player.y += pSpeed;
+                if (keys['KeyA']) player.x -= pSpeed; if (keys['KeyD']) player.x += pSpeed;
+                player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
             }
 
             // Bot logic
             bots.forEach((bot, i) => {
-                const dx = player.x - bot.x;
-                const dy = player.y - bot.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-
-                if (dist < 250) {
+                const dx = player.x - bot.x, dy = player.y - bot.y, dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 200) {
                     bot.angle = Math.atan2(dy, dx);
-                    bot.x += Math.cos(bot.angle) * bot.speed;
-                    bot.y += Math.sin(bot.angle) * bot.speed;
-                } else {
-                    if (Date.now() > bot.changeDirTimer) {
-                        bot.angle = Math.random() * Math.PI * 2;
-                        bot.changeDirTimer = Date.now() + 2000;
-                    }
-                    bot.x += Math.cos(bot.angle) * bot.speed;
-                    bot.y += Math.sin(bot.angle) * bot.speed;
+                    if (dist < 70 && Math.random() < 0.05) triggerAttack(bot);
+                } else if (Date.now() > bot.changeTimer) {
+                    bot.angle = Math.random() * Math.PI * 2;
+                    bot.changeTimer = Date.now() + 1500;
                 }
+                bot.x += Math.cos(bot.angle) * bot.speed;
+                bot.y += Math.sin(bot.angle) * bot.speed;
 
-                // Collision: Player vs Bot
-                resolveCollision(player, bot);
+                handleHitboxes(player, bot);
+                for (let j = i+1; j < bots.length; j++) handleHitboxes(bots[i], bots[j]);
 
-                // Collision: Bot vs Bot
-                for (let j = i + 1; j < bots.length; j++) {
-                    resolveCollision(bots[i], bots[j]);
-                }
+                // Hit Detection Logic
+                checkHit(player, bot);
+                checkHit(bot, player);
 
-                // Combat logic
-                const pAngle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-                const swordX = player.x + Math.cos(pAngle) * 50;
-                const swordY = player.y + Math.sin(pAngle) * 50;
-                const hitDist = Math.sqrt((swordX - bot.x)**2 + (swordY - bot.y)**2);
-                
-                if (hitDist < bot.radius + 10) {
-                    bots[i] = createBot();
-                    kills++;
-                    scoreElement.innerText = `Kills: ${kills}`;
-                }
+                if (bot.hp <= 0) { bots[i] = createEntity(null, null, colors[Math.floor(Math.random()*colors.length)]); kills++; scoreElement.innerText = `Kills: ${kills}`; }
             });
+
+            if (player.hp <= 0) { player.hp = 100; player.x = canvas.width/2; player.y = canvas.height/2; kills = 0; scoreElement.innerText = `Kills: ${kills}`; }
+            player.x = Math.max(RADIUS, Math.min(canvas.width - RADIUS, player.x));
+            player.y = Math.max(RADIUS, Math.min(canvas.height - RADIUS, player.y));
+        }
+
+        function checkHit(attacker, target) {
+            if (!attacker.isAttacking) return;
+            const sAngle = attacker.angle + attacker.swingAngle;
+            const sx = attacker.x + Math.cos(sAngle) * 55;
+            const sy = attacker.y + Math.sin(sAngle) * 55;
+            const dist = Math.sqrt((sx - target.x)**2 + (sy - target.y)**2);
+            if (dist < target.radius + 10) {
+                target.hp -= 1; // Continuous damage during swing overlap
+            }
         }
 
         function draw() {
-            // Grass Floor
-            ctx.fillStyle = '#2ecc71'; 
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Grass detail lines
-            ctx.strokeStyle = '#27ae60';
-            ctx.lineWidth = 2;
-            for(let i=0; i<canvas.width; i+=60) {
-                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
-            }
-
+            ctx.fillStyle = '#4caf50'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#43a047';
+            for(let i=0; i<canvas.width; i+=80) ctx.fillRect(i, 0, 40, canvas.height);
             update();
-            bots.forEach(bot => drawEntity(bot, false));
-            drawEntity(player, true);
-
+            bots.forEach(drawEntity);
+            drawEntity(player);
             requestAnimationFrame(draw);
         }
 
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
         draw();
     </script>
 </body>
