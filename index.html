@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SwordsBattle.io | Combat Edition</title>
+    <title>SwordsBattle.io | Exploration Edition</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #1b5e20; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
@@ -14,7 +14,12 @@
             pointer-events: none; border: 2px solid #2e7d32; z-index: 10;
         }
 
-        /* Mobile Controls */
+        #minimap {
+            position: absolute; top: 10px; right: 10px; width: 150px; height: 150px;
+            background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px; z-index: 10;
+        }
+
         .touch-ctrl {
             position: absolute; border-radius: 50%;
             background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.4);
@@ -36,6 +41,7 @@
         <div id="score">Kills: 0</div>
     </div>
 
+    <canvas id="minimap"></canvas>
     <div id="joystick-base" class="touch-ctrl"><div id="joystick-stick"></div></div>
     <div id="dash-btn" class="touch-ctrl">DASH</div>
     <div id="atk-btn" class="touch-ctrl">SWING</div>
@@ -45,7 +51,11 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const mCanvas = document.getElementById('minimap');
+        const mCtx = mCanvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+
+        // Mobile UI Elements
         const joyBase = document.getElementById('joystick-base'), joyStick = document.getElementById('joystick-stick');
         const dashBtn = document.getElementById('dash-btn'), atkBtn = document.getElementById('atk-btn');
 
@@ -53,52 +63,48 @@
         canvas.height = window.innerHeight;
 
         let kills = 0;
-        const mouse = { x: canvas.width/2, y: canvas.height/2 };
         const keys = {};
+        const mouse = { x: 0, y: 0 };
         let isTouch = false;
         const joyState = { x: 0, y: 0, active: false };
 
-        // Game Constants
-        const BOT_COUNT = 4; 
+        // --- WORLD CONSTANTS ---
+        const WORLD_SIZE = 3000; 
+        const BOT_COUNT = 15; // More bots for a bigger map
         const RADIUS = 24;
-        const SWING_SPEED = 0.2; // Radians per frame
+
+        const camera = { x: 0, y: 0 };
 
         function createEntity(x, y, color, isPlayer = false) {
             return {
-                x: x || Math.random() * canvas.width,
-                y: y || Math.random() * canvas.height,
+                x: x || Math.random() * WORLD_SIZE,
+                y: y || Math.random() * WORLD_SIZE,
                 radius: RADIUS,
                 color: color,
-                hp: 100,
-                maxHp: 100,
-                speed: isPlayer ? 4.5 : 2.2,
+                hp: 100, maxHp: 100,
+                speed: isPlayer ? 5 : 2.5,
                 angle: 0,
-                targetAngle: 0,
                 isPlayer: isPlayer,
-                // Combat states
-                isAttacking: false,
-                swingAngle: 0,
-                dashTimer: 0,
-                dashCooldown: 0,
+                isAttacking: false, swingAngle: 0,
+                dashTimer: 0, dashCooldown: 0,
                 changeTimer: 0
             };
         }
 
-        const player = createEntity(canvas.width/2, canvas.height/2, '#2196f3', true);
+        const player = createEntity(WORLD_SIZE/2, WORLD_SIZE/2, '#2196f3', true);
         const bots = [];
-        const colors = ['#f44336', '#ff9800', '#9c27b0', '#ffeb3b'];
-        for (let i = 0; i < BOT_COUNT; i++) bots.push(createEntity(null, null, colors[i]));
+        const colors = ['#f44336', '#ff9800', '#9c27b0', '#ffeb3b', '#e91e63'];
+        for (let i = 0; i < BOT_COUNT; i++) bots.push(createEntity(null, null, colors[i % colors.length]));
 
-        // --- Inputs ---
+        // --- INPUTS ---
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
             if (e.code === 'Space') triggerDash(player);
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
         window.addEventListener('mousedown', () => { if(!isTouch) triggerAttack(player); });
-        window.addEventListener('mousemove', e => { if(!isTouch) { mouse.x = e.clientX; mouse.y = e.clientY; } });
+        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
-        // Touch handling
         window.addEventListener('touchstart', () => {
             isTouch = true;
             [joyBase, dashBtn, atkBtn].forEach(el => el.style.display = 'flex');
@@ -137,103 +143,130 @@
 
         function drawEntity(e) {
             ctx.save();
-            ctx.translate(e.x, e.y);
+            // Translate based on camera
+            ctx.translate(e.x - camera.x, e.y - camera.y);
             
-            // Health Bar
-            const barW = 40;
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-barW/2, -e.radius - 15, barW, 6);
+            // HP Bar
+            ctx.fillStyle = '#333'; ctx.fillRect(-20, -e.radius - 12, 40, 5);
             ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff5252';
-            ctx.fillRect(-barW/2, -e.radius - 15, barW * (e.hp/e.maxHp), 6);
+            ctx.fillRect(-20, -e.radius - 12, 40 * (e.hp/e.maxHp), 5);
 
-            // Set Facing Angle
-            let faceAngle = e.isPlayer && !isTouch ? Math.atan2(mouse.y - e.y, mouse.x - e.x) : e.angle;
+            // Angle
+            let faceAngle = e.isPlayer && !isTouch ? Math.atan2((mouse.y + camera.y) - e.y, (mouse.x + camera.x) - e.x) : e.angle;
             ctx.rotate(faceAngle);
 
-            // Sword + Swing Animation
+            // Sword
             ctx.save();
             if (e.isAttacking) {
                 ctx.rotate(e.swingAngle);
-                e.swingAngle += SWING_SPEED;
+                e.swingAngle += 0.2;
                 if (e.swingAngle > 1.2) e.isAttacking = false;
             }
-            
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = e.isPlayer ? '#00e5ff' : '#ff1744';
-            ctx.fillStyle = '#f5f5f5'; ctx.fillRect(22, -4, 48, 8); 
-            ctx.fillStyle = e.isPlayer ? '#00b0ff' : '#d50000'; ctx.fillRect(28, -1, 38, 2);
-            ctx.fillStyle = '#37474f'; ctx.fillRect(22, -14, 6, 28);
+            ctx.shadowBlur = 10; ctx.shadowColor = e.isPlayer ? '#00e5ff' : '#ff1744';
+            ctx.fillStyle = '#f5f5f5'; ctx.fillRect(20, -4, 45, 8); 
+            ctx.fillStyle = '#37474f'; ctx.fillRect(20, -12, 5, 24);
             ctx.restore();
 
             // Body
             ctx.shadowBlur = 0;
             ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
             ctx.fillStyle = e.color; ctx.fill();
-            ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
             ctx.restore();
         }
 
         function update() {
-            // Player Movement
-            let pSpeed = player.dashTimer > 0 ? 14 : player.speed;
+            let pSpeed = player.dashTimer > 0 ? 15 : player.speed;
             if (player.dashTimer > 0) player.dashTimer--;
             if (player.dashCooldown > 0) player.dashCooldown--;
 
+            // Player Movement
             if (isTouch) {
                 player.x += joyState.x * pSpeed; player.y += joyState.y * pSpeed;
                 if(joyState.active) player.angle = Math.atan2(joyState.y, joyState.x);
             } else {
                 if (keys['KeyW']) player.y -= pSpeed; if (keys['KeyS']) player.y += pSpeed;
                 if (keys['KeyA']) player.x -= pSpeed; if (keys['KeyD']) player.x += pSpeed;
-                player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+                player.angle = Math.atan2((mouse.y + camera.y) - player.y, (mouse.x + camera.x) - player.x);
             }
 
-            // Bot logic
+            // World Boundaries
+            player.x = Math.max(RADIUS, Math.min(WORLD_SIZE - RADIUS, player.x));
+            player.y = Math.max(RADIUS, Math.min(WORLD_SIZE - RADIUS, player.y));
+
+            // Camera follow (Centered on player)
+            camera.x = player.x - canvas.width / 2;
+            camera.y = player.y - canvas.height / 2;
+
+            // Bot Update
             bots.forEach((bot, i) => {
                 const dx = player.x - bot.x, dy = player.y - bot.y, dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 200) {
+                if (dist < 300) {
                     bot.angle = Math.atan2(dy, dx);
-                    if (dist < 70 && Math.random() < 0.05) triggerAttack(bot);
+                    if (dist < 80 && Math.random() < 0.05) triggerAttack(bot);
                 } else if (Date.now() > bot.changeTimer) {
                     bot.angle = Math.random() * Math.PI * 2;
-                    bot.changeTimer = Date.now() + 1500;
+                    bot.changeTimer = Date.now() + 2000;
                 }
                 bot.x += Math.cos(bot.angle) * bot.speed;
                 bot.y += Math.sin(bot.angle) * bot.speed;
+                bot.x = Math.max(RADIUS, Math.min(WORLD_SIZE - RADIUS, bot.x));
+                bot.y = Math.max(RADIUS, Math.min(WORLD_SIZE - RADIUS, bot.y));
 
                 handleHitboxes(player, bot);
                 for (let j = i+1; j < bots.length; j++) handleHitboxes(bots[i], bots[j]);
 
-                // Hit Detection Logic
-                checkHit(player, bot);
-                checkHit(bot, player);
+                checkHit(player, bot); checkHit(bot, player);
 
                 if (bot.hp <= 0) { bots[i] = createEntity(null, null, colors[Math.floor(Math.random()*colors.length)]); kills++; scoreElement.innerText = `Kills: ${kills}`; }
             });
 
-            if (player.hp <= 0) { player.hp = 100; player.x = canvas.width/2; player.y = canvas.height/2; kills = 0; scoreElement.innerText = `Kills: ${kills}`; }
-            player.x = Math.max(RADIUS, Math.min(canvas.width - RADIUS, player.x));
-            player.y = Math.max(RADIUS, Math.min(canvas.height - RADIUS, player.y));
+            if (player.hp <= 0) { player.hp = 100; player.x = WORLD_SIZE/2; player.y = WORLD_SIZE/2; kills = 0; scoreElement.innerText = `Kills: ${kills}`; }
         }
 
         function checkHit(attacker, target) {
             if (!attacker.isAttacking) return;
             const sAngle = attacker.angle + attacker.swingAngle;
-            const sx = attacker.x + Math.cos(sAngle) * 55;
-            const sy = attacker.y + Math.sin(sAngle) * 55;
+            const sx = attacker.x + Math.cos(sAngle) * 55, sy = attacker.y + Math.sin(sAngle) * 55;
             const dist = Math.sqrt((sx - target.x)**2 + (sy - target.y)**2);
-            if (dist < target.radius + 10) {
-                target.hp -= 1; // Continuous damage during swing overlap
-            }
+            if (dist < target.radius + 15) target.hp -= 1.5;
+        }
+
+        function drawMinimap() {
+            mCtx.clearRect(0,0,150,150);
+            const scale = 150 / WORLD_SIZE;
+            // Draw Player dot
+            mCtx.fillStyle = '#00e5ff';
+            mCtx.beginPath(); mCtx.arc(player.x * scale, player.y * scale, 3, 0, Math.PI*2); mCtx.fill();
+            // Draw Bots
+            mCtx.fillStyle = '#ff1744';
+            bots.forEach(b => {
+                mCtx.beginPath(); mCtx.arc(b.x * scale, b.y * scale, 2, 0, Math.PI*2); mCtx.fill();
+            });
         }
 
         function draw() {
-            ctx.fillStyle = '#4caf50'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#43a047';
-            for(let i=0; i<canvas.width; i+=80) ctx.fillRect(i, 0, 40, canvas.height);
+            ctx.fillStyle = '#1b5e20'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+            
+            // Draw Map Grass Pattern
+            ctx.fillStyle = '#4caf50';
+            for(let x=0; x < WORLD_SIZE; x += 160) {
+                for(let y=0; y < WORLD_SIZE; y += 160) {
+                    ctx.fillRect(x, y, 80, 160);
+                }
+            }
+            // Draw World Border
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+            ctx.restore();
+
             update();
             bots.forEach(drawEntity);
             drawEntity(player);
+            drawMinimap();
             requestAnimationFrame(draw);
         }
 
