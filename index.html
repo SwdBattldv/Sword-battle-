@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwordsBattle.io Clone (Offline Bots)</title>
+    <style>
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        #overlay {
+            position: absolute; top: 20px; left: 20px; color: white;
+            background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; pointer-events: none;
+        }
+        .controls { font-size: 0.8em; color: #ccc; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <h2 style="margin:0">SwordsBattle.io</h2>
+        <div id="score">Kills: 0</div>
+        <div class="controls">WASD to Move | Mouse to Aim</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let kills = 0;
+        const mouse = { x: 0, y: 0 };
+        const keys = {};
+
+        // Player Setup
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 20,
+            color: '#00d4ff',
+            speed: 4,
+            angle: 0
+        };
+
+        // Bot Setup
+        const bots = [];
+        const botCount = 8;
+        const colors = ['#ff4757', '#2ed573', '#eccc68', '#ffa502', '#3742fa'];
+
+        function createBot() {
+            return {
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: 20,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                speed: 2 + Math.random() * 2,
+                angle: Math.random() * Math.PI * 2,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                changeDirTimer: 0
+            };
+        }
+
+        for (let i = 0; i < botCount; i++) bots.push(createBot());
+
+        // Listeners
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        function drawEntity(entity, isPlayer) {
+            // Draw Body
+            ctx.save();
+            ctx.translate(entity.x, entity.y);
+            
+            // Calculate angle to mouse (if player) or move direction (if bot)
+            let angle = isPlayer ? Math.atan2(mouse.y - entity.y, mouse.x - entity.x) : entity.angle;
+            ctx.rotate(angle);
+
+            // Draw Sword
+            ctx.fillStyle = '#dfe6e9';
+            ctx.fillRect(20, -5, 40, 10); // The blade
+            ctx.fillStyle = '#636e72';
+            ctx.fillRect(20, -8, 5, 16);  // The guard
+
+            // Draw Character
+            ctx.beginPath();
+            ctx.arc(0, 0, entity.radius, 0, Math.PI * 2);
+            ctx.fillStyle = entity.color;
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        function update() {
+            // Player Movement
+            if (keys['KeyW'] || keys['ArrowUp']) player.y -= player.speed;
+            if (keys['KeyS'] || keys['ArrowDown']) player.y += player.speed;
+            if (keys['KeyA'] || keys['ArrowLeft']) player.x -= player.speed;
+            if (keys['KeyD'] || keys['ArrowRight']) player.x += player.speed;
+
+            // Update Bots
+            bots.forEach((bot, index) => {
+                // Simple AI: Chase player if close, otherwise wander
+                const dx = player.x - bot.x;
+                const dy = player.y - bot.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < 300) {
+                    bot.angle = Math.atan2(dy, dx);
+                    bot.x += Math.cos(bot.angle) * bot.speed;
+                    bot.y += Math.sin(bot.angle) * bot.speed;
+                } else {
+                    if (Date.now() > bot.changeDirTimer) {
+                        bot.vx = (Math.random() - 0.5) * 3;
+                        bot.vy = (Math.random() - 0.5) * 3;
+                        bot.angle = Math.atan2(bot.vy, bot.vx);
+                        bot.changeDirTimer = Date.now() + 2000;
+                    }
+                    bot.x += bot.vx;
+                    bot.y += bot.vy;
+                }
+
+                // Simple "Combat" (If player's sword area touches bot)
+                const pAngle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+                const swordX = player.x + Math.cos(pAngle) * 40;
+                const swordY = player.y + Math.sin(pAngle) * 40;
+                
+                const swordDist = Math.sqrt((swordX - bot.x)**2 + (swordY - bot.y)**2);
+                if (swordDist < bot.radius + 5) {
+                    bots[index] = createBot(); // Respawn bot
+                    kills++;
+                    scoreElement.innerText = `Kills: ${kills}`;
+                }
+
+                // Screen Wrap for bots
+                if (bot.x < 0) bot.x = canvas.width;
+                if (bot.x > canvas.width) bot.x = 0;
+                if (bot.y < 0) bot.y = canvas.height;
+                if (bot.y > canvas.height) bot.y = 0;
+            });
+        }
+
+        function loop() {
+            ctx.fillStyle = '#2d3436';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Grid Background
+            ctx.strokeStyle = '#353b48';
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=50) {
+                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for(let i=0; i<canvas.height; i+=50) {
+                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            update();
+            bots.forEach(bot => drawEntity(bot, false));
+            drawEntity(player, true);
+
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        loop();
+    </script>
+</body>
+</html>
