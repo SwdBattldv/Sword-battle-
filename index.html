@@ -263,10 +263,7 @@
             ctx.save(); ctx.translate(x, y);
             if(e.hidden) ctx.globalAlpha = 0.3;
 
-            // Name Overhead - FIXED: Now appears above characters
-            ctx.fillStyle = "white"; 
-            ctx.font = `bold ${14 * e.scale}px Arial`; 
-            ctx.textAlign = "center";
+            ctx.fillStyle = "white"; ctx.font = `bold ${14 * e.scale}px Arial`; ctx.textAlign = "center";
             ctx.fillText(e.name, 0, -55 * e.scale);
 
             if(!e.hidden || (e.isPlayer)) {
@@ -346,7 +343,7 @@
                             atk.kills++; atk.xp += 100*vic.tier; 
                             if(atk.isPlayer) {
                                 kills++;
-                                sessionCoins += 50 * vic.tier; // COIN FIX: Killing enemies grants coins
+                                sessionCoins += 50 * vic.tier;
                                 addDamageText(vic.x, vic.y, `+${50*vic.tier} Coins`, "#ffd700");
                             }
                         }
@@ -380,7 +377,6 @@
                 bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.y));
                 entities.forEach(other => { if(bot !== other) resolveCollision(bot, other); });
                 if (bot.hp <= 0) { 
-                    // COIN FIX: Drops 3 coins on death
                     for(let i=0; i<3; i++) spawnGem(bot.x + (Math.random()-0.5)*100, bot.y + (Math.random()-0.5)*100, 50); 
                     bots.splice(idx, 1); spawnBot(); 
                 }
@@ -448,35 +444,45 @@
             ctx.restore();
             
             if (gameActive) {
-                // MINIMAP SYSTEM FIX - Fixed Zoom and Point Scale
-                miniCtx.clearRect(0,0,150,150);
-                miniCtx.fillStyle = 'rgba(0,0,0,0.8)';
+                // FIXED MINIMAP SYSTEM
+                miniCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+                miniCtx.clearRect(0, 0, 150, 150);
+                miniCtx.fillStyle = 'rgba(0,0,0,0.85)';
                 miniCtx.fillRect(0,0,150,150);
                 
-                const s = 150 / WORLD_SIZE; 
-                
-                // Draw enemies as small points (so they aren't giant red blobs)
+                // Set scale: 150px / 6000 world units
+                const scale = 150 / WORLD_SIZE;
+                miniCtx.scale(scale, scale);
+
+                // Draw bots
                 miniCtx.fillStyle = '#ff1744';
                 bots.forEach(b => {
                     if(!b.hidden) {
                         miniCtx.beginPath();
-                        miniCtx.arc(b.x * s, b.y * s, 1.5, 0, Math.PI * 2);
+                        miniCtx.arc(b.x, b.y, 40, 0, Math.PI * 2); // Dots are sized appropriately for 6000 world units
                         miniCtx.fill();
                     }
                 });
 
-                // Draw player as a small triangle pointing in looking direction
-                miniCtx.save();
-                miniCtx.translate(player.x * s, player.y * s);
-                miniCtx.rotate(player.angle);
+                // Draw player pulsing radar
+                const pulse = Math.sin(Date.now() * 0.01) * 50;
+                miniCtx.strokeStyle = 'rgba(0, 230, 118, 0.5)';
+                miniCtx.lineWidth = 20;
+                miniCtx.beginPath();
+                miniCtx.arc(player.x, player.y, 100 + pulse, 0, Math.PI * 2);
+                miniCtx.stroke();
+
                 miniCtx.fillStyle = '#00e676';
                 miniCtx.beginPath();
-                miniCtx.moveTo(4, 0);
-                miniCtx.lineTo(-3, -3);
-                miniCtx.lineTo(-3, 3);
-                miniCtx.closePath();
+                miniCtx.arc(player.x, player.y, 120, 0, Math.PI * 2);
                 miniCtx.fill();
-                miniCtx.restore();
+                
+                // Draw map border on minimap
+                miniCtx.strokeStyle = 'white';
+                miniCtx.lineWidth = 30;
+                miniCtx.strokeRect(0,0, WORLD_SIZE, WORLD_SIZE);
+
+                miniCtx.setTransform(1, 0, 0, 1, 0, 0); // Restore UI transform
                 
                 document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
