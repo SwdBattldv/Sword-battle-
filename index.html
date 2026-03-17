@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SwordsBattle.io | Fixed Layers</title>
+    <title>SwordsBattle.io | Fixed Sprite</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
@@ -20,22 +20,20 @@
         #ui {
             position: absolute; top: 10px; left: 10px; color: white;
             background: rgba(0,0,0,0.7); padding: 12px; border-radius: 12px; 
-            pointer-events: none; z-index: 100; display: none; border: 1px solid #444;
+            pointer-events: none; z-index: 100; display: none;
         }
         #minimap {
             position: absolute; top: 10px; right: 10px; width: 120px; height: 120px;
             background: rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.2); border-radius: 8px; z-index: 100; display: none;
         }
 
-        /* Fixed Mobile Controls */
         .touch-ctrl {
             position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.15); 
             border: 2px solid rgba(255, 255, 255, 0.3); display: none; z-index: 500; touch-action: none;
-            user-select: none; -webkit-user-select: none;
         }
         #joystick-base { bottom: 50px; left: 50px; width: 120px; height: 120px; }
         #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; opacity: 0.6; }
-        #dash-btn { bottom: 160px; right: 50px; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
+        #dash-btn { bottom: 160px; right: 50px; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
         #atk-btn { bottom: 50px; right: 40px; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; background: rgba(255, 0, 0, 0.3); }
     </style>
 </head>
@@ -116,7 +114,7 @@
             currentTheme = themes[document.getElementById('worldSelect').value];
             
             bushes.length = 0;
-            for(let i=0; i<25; i++) bushes.push({ x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, size: 130 });
+            for(let i=0; i<30; i++) bushes.push({ x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, size: 140 });
             
             bots = [];
             const colors = ['#f44336', '#ff9800', '#9c27b0', '#ffeb3b'];
@@ -135,18 +133,17 @@
             gameActive = true;
         };
 
-        // --- CONTROLS ---
+        // --- INPUTS ---
         window.onkeydown = e => keys[e.code] = true;
         window.onkeyup = e => keys[e.code] = false;
         window.onmousedown = () => { if(gameActive && !isTouch) triggerAttack(player); };
         window.onmousemove = e => { mouse.x = e.clientX; mouse.y = e.clientY; };
 
-        // Force Mobile UI detection
         window.addEventListener('touchstart', () => {
             if(!gameActive) return;
             isTouch = true;
             document.querySelectorAll('.touch-ctrl').forEach(el => el.style.display = 'flex');
-        }, {passive: false});
+        });
 
         joyBase.addEventListener('touchstart', (e) => { joyState.active = true; e.preventDefault(); }, {passive: false});
         window.addEventListener('touchmove', (e) => {
@@ -161,9 +158,7 @@
             joyState.y = Math.sin(a) * d / 50;
             joyStick.style.transform = `translate(${joyState.x * 50}px, ${joyState.y * 50}px)`;
         }, {passive: false});
-        window.addEventListener('touchend', () => { 
-            joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; 
-        });
+        window.addEventListener('touchend', () => { joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; });
 
         document.getElementById('atk-btn').addEventListener('touchstart', (e) => { e.preventDefault(); triggerAttack(player); });
         document.getElementById('dash-btn').addEventListener('touchstart', (e) => { e.preventDefault(); triggerDash(player); });
@@ -171,7 +166,7 @@
         function triggerAttack(e) { if (!e.isAttacking) { e.isAttacking = true; e.swingAngle = -1.2; } }
         function triggerDash(e) { if (e.dashCooldown <= 0) { e.dashTimer = 12; e.dashCooldown = 60; } }
 
-        // --- CORE LOGIC ---
+        // --- PHYSICS & LOGIC ---
         function update() {
             if(!gameActive) return;
 
@@ -192,6 +187,10 @@
             }
             player.vx *= 0.85; player.vy *= 0.85;
 
+            // Boundaries
+            player.x = Math.max(player.radius, Math.min(WORLD_SIZE - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(WORLD_SIZE - player.radius, player.y));
+
             camera.x = player.x - canvas.width / 2;
             camera.y = player.y - canvas.height / 2;
 
@@ -210,6 +209,8 @@
                 bot.x += Math.cos(bot.angle)*bot.speed + bot.vx;
                 bot.y += Math.sin(bot.angle)*bot.speed + bot.vy;
                 bot.vx *= 0.85; bot.vy *= 0.85;
+                bot.x = Math.max(bot.radius, Math.min(WORLD_SIZE - bot.radius, bot.x));
+                bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE - bot.radius, bot.y));
 
                 checkHit(player, bot); checkHit(bot, player);
 
@@ -233,71 +234,77 @@
             }
         }
 
+        // --- RENDERING ---
         function drawEntity(e) {
             ctx.save();
             ctx.translate(e.x - camera.x, e.y - camera.y);
             
-            // Set opacity based on stealth
-            ctx.globalAlpha = e.isHidden ? 0.35 : 1.0;
+            // 1. Force Visibility Reset
+            ctx.globalAlpha = e.isHidden ? 0.4 : 1.0;
 
-            // HP Bar (Drawn high enough to see)
+            // 2. Sprite Body (Drawn centered)
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+            ctx.fillStyle = e.color;
+            ctx.fill();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 3. HP & Name (Above head)
+            ctx.globalAlpha = 1.0; // Health bar is always solid
             ctx.fillStyle = '#111'; ctx.fillRect(-25, -45, 50, 6);
             ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff1744';
             ctx.fillRect(-25, -45, 50 * (e.hp/e.maxHp), 6);
-            
-            // Name
             ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center';
             ctx.fillText(e.name, 0, -55);
 
+            // 4. Sword Swing (Rotation based on facing angle)
             ctx.rotate(e.angle);
-            // Sword
             ctx.save();
             if (e.isAttacking) { 
                 ctx.rotate(e.swingAngle); 
-                e.swingAngle += 0.28; 
+                e.swingAngle += 0.3; 
                 if(e.swingAngle > 1.2) e.isAttacking = false; 
             }
             ctx.fillStyle = '#eee'; ctx.fillRect(25, -4, 45, 8); 
             ctx.fillStyle = '#444'; ctx.fillRect(25, -12, 6, 24);
             ctx.restore();
 
-            // Body
-            ctx.beginPath(); ctx.arc(0,0,e.radius,0,Math.PI*2);
-            ctx.fillStyle = e.color; ctx.fill(); 
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
-            
             ctx.restore();
-            ctx.globalAlpha = 1.0; // Reset alpha for next draws
         }
 
         function draw() {
-            // 1. Clear Screen
-            ctx.fillStyle = '#111'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            // Background
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
             if(!gameActive) { requestAnimationFrame(draw); return; }
 
-            // 2. Start Camera
-            ctx.save(); ctx.translate(-camera.x, -camera.y);
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
             
-            // 3. Draw Background
-            ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE,WORLD_SIZE);
+            // Map Ground
+            ctx.fillStyle = currentTheme.bg;
+            ctx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
             ctx.fillStyle = currentTheme.alt;
             for(let x=0; x<WORLD_SIZE; x+=200) for(let y=0; y<WORLD_SIZE; y+=200) ctx.fillRect(x,y,100,100);
 
-            // 4. Draw Entities (Players/Bots) - CRITICAL: Drawn BEFORE bushes
+            // DRAW PLAYERS & BOTS (Critical order: after ground)
             bots.forEach(drawEntity);
             drawEntity(player);
 
-            // 5. Draw Bushes on TOP (Layering fix)
+            // DRAW BUSHES (On top of everything)
             ctx.fillStyle = currentTheme.bush;
             bushes.forEach(b => { 
                 ctx.beginPath(); ctx.arc(b.x, b.y, b.size/2, 0, Math.PI*2); ctx.fill(); 
-                ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2; ctx.stroke();
             });
             
             ctx.restore();
             update();
             
-            // 6. Draw UI/Minimap
+            // Minimap
             mCtx.clearRect(0,0,120,120);
             const ms = 120/WORLD_SIZE;
             mCtx.fillStyle = '#00e5ff'; mCtx.fillRect(player.x*ms, player.y*ms, 5, 5);
