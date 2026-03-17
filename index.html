@@ -115,7 +115,6 @@
             gameActive = true;
         };
 
-        // --- FIXED MOVEMENT LOGIC ---
         joyBase.addEventListener('touchstart', (e) => {
             isTouch = true; joyState.active = true;
             joyState.id = e.targetTouches[0].identifier;
@@ -132,7 +131,6 @@
             const dist = Math.min(60, Math.hypot(dx, dy));
             const angle = Math.atan2(dy, dx);
             
-            // Normalize values between -1 and 1
             joyState.x = (Math.cos(angle) * dist) / 60;
             joyState.y = (Math.sin(angle) * dist) / 60;
             
@@ -150,21 +148,19 @@
 
         function drawEntity(e) {
             ctx.save();
-            ctx.translate(e.x - camera.x, e.y - camera.y);
+            // REMOVED camera subtraction here because it is handled by the global ctx.translate
+            ctx.translate(e.x, e.y);
             
-            // Draw HP Bar
             ctx.fillStyle = '#111'; ctx.fillRect(-30, -50, 60, 8);
             ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff1744';
             ctx.fillRect(-30, -50, 60 * (e.hp/e.maxHp), 8);
 
             ctx.rotate(e.angle);
-            // Sword
             ctx.save();
             if (e.isAttacking) { ctx.rotate(e.swingAngle); e.swingAngle += 0.3; if(e.swingAngle > 1.2) e.isAttacking = false; }
             ctx.fillStyle = '#eee'; ctx.fillRect(30, -5, 45, 10);
             ctx.restore();
 
-            // Character
             ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
             ctx.fillStyle = e.color; ctx.fill();
             ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.stroke();
@@ -178,18 +174,15 @@
             if (player.dashTimer > 0) player.dashTimer--;
             if (player.dashCooldown > 0) player.dashCooldown--;
 
-            // APPLY MOVEMENT TO POSITION
             if (joyState.active) {
                 player.x += joyState.x * s;
                 player.y += joyState.y * s;
                 player.angle = Math.atan2(joyState.y, joyState.x);
             }
 
-            // Boundary Lock
             player.x = Math.max(0, Math.min(WORLD_SIZE, player.x));
             player.y = Math.max(0, Math.min(WORLD_SIZE, player.y));
 
-            // CAMERA FOLLOWS POSITION
             camera.x = player.x - w / 2;
             camera.y = player.y - h / 2;
 
@@ -203,6 +196,7 @@
                 if (player.isAttacking && d < 100) bot.hp -= 2;
                 if (bot.hp <= 0) { bot.x = Math.random()*WORLD_SIZE; bot.y = Math.random()*WORLD_SIZE; bot.hp = 100; kills++; }
             });
+            document.getElementById('score').innerText = "Kills: " + kills;
         }
 
         function draw() {
@@ -213,7 +207,6 @@
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
             
-            // Map Background (Grid)
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
             ctx.fillStyle = currentTheme.alt;
             for(let x=0; x<WORLD_SIZE; x+=200) {
@@ -223,7 +216,7 @@
             }
 
             bots.forEach(drawEntity);
-            drawEntity(player);
+            drawEntity(player); // Now correctly moves relative to camera
 
             ctx.fillStyle = currentTheme.bush;
             bushes.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.size/2, 0, Math.PI*2); ctx.fill(); });
