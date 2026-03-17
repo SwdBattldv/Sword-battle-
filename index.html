@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sword Battle | Fixed Minimap & Knockback</title>
+    <title>Sword Battle</title>
     <style>
         :root { --primary: #00e676; --accent: #ffd700; --bg-dark: #1a1a1a; }
         body, html { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; }
@@ -57,7 +57,7 @@
 
         #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.6); padding: 15px 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px); display: none; z-index: 1000; }
         #right-ui { position: absolute; top: 20px; right: 20px; display: none; flex-direction: column; gap: 15px; z-index: 1000; }
-        #minimap-container { width: 150px; height: 150px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; overflow: hidden; }
+        #minimap-container { width: 150px; height: 150px; background: rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; overflow: hidden; position: relative; }
         #leaderboard { width: 150px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; color: white; font-size: 12px; }
         
         .touch-ctrl { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); display: none; z-index: 1500; align-items: center; justify-content: center; }
@@ -72,7 +72,7 @@
     <div id="menu">
         <button id="openShopBtn">SHOP</button>
         <div class="menu-box">
-            <h1 style="color:var(--primary); margin: 0 0 5px 0; letter-spacing: 4px; font-style: italic;">SWORD.IO</h1>
+            <h1 style="color:var(--primary); margin: 0 0 5px 0; letter-spacing: 2px; text-transform: uppercase;">SWORD BATTLE</h1>
             <div class="coin-count" id="menu-coins">Coins: 0</div>
             <input type="text" id="username" placeholder="Enter Name..." maxlength="12">
             <select id="worldSelect">
@@ -103,9 +103,12 @@
     </div>
 
     <div id="ui">
-        <div id="ui-name" style="font-weight:900; color:var(--primary);">Player</div>
-        <div id="xp-display" style="font-size:12px; opacity:0.8;">Lvl Progress</div>
-        <div id="score" style="font-size:14px; font-weight:bold; color:var(--accent);">Kills: 0</div>
+        <div id="ui-name" style="font-weight:900; color:var(--primary); font-size: 18px;">Player</div>
+        <div id="xp-display" style="font-size:12px; opacity:0.8; margin-bottom: 5px;">Tier 1: 0 / 100</div>
+        <div style="display: flex; gap: 15px;">
+            <div id="score" style="font-size:14px; font-weight:bold; color:#fff;">Kills: 0</div>
+            <div id="ingame-coins" style="font-size:14px; font-weight:bold; color:var(--accent);">Coins: 0</div>
+        </div>
     </div>
 
     <div id="right-ui">
@@ -194,14 +197,6 @@
             kx: 0, ky: 0, xp: 0, totalXp: 0, nextLevel: 100, tier: 1, scale: 1, isPlayer: true, kills: 0, hidden: false, trail: []
         };
 
-        function findSafeSpawn() {
-            for(let i=0; i<50; i++){
-                let tx = Math.random() * (WORLD_SIZE-800)+400, ty = Math.random() * (WORLD_SIZE-800)+400;
-                if(!bots.some(b => Math.hypot(tx-b.x, ty-b.y) < 700)) return {x:tx, y:ty};
-            }
-            return {x: WORLD_SIZE/2, y: WORLD_SIZE/2};
-        }
-
         function spawnBot() {
             const tier = Math.floor(Math.random() * 2) + 1;
             bots.push({
@@ -227,8 +222,9 @@
         };
 
         function resetPlayer() {
-            const safe = findSafeSpawn();
-            player.x = safe.x; player.y = safe.y; player.hp = 150; player.maxHp = 150; player.xp = 0; player.tier = 1;
+            player.x = WORLD_SIZE/2 + (Math.random()-0.5)*1000;
+            player.y = WORLD_SIZE/2 + (Math.random()-0.5)*1000;
+            player.hp = 150; player.maxHp = 150; player.xp = 0; player.tier = 1;
             player.scale = 1; player.radius = 30; player.nextLevel = 100; player.totalXp = 0; player.kills = 0; kills = 0; player.trail = [];
         }
 
@@ -287,16 +283,22 @@
         function update() {
             if (menuActive) {
                 menuCamAngle += 0.002;
-                camera.x = WORLD_SIZE/2 + Math.cos(menuCamAngle) * 1000;
-                camera.y = WORLD_SIZE/2 + Math.sin(menuCamAngle) * 1000;
-                camera.zoom = 0.6;
+                camera.x = WORLD_SIZE/2 + Math.cos(menuCamAngle) * 1200;
+                camera.y = WORLD_SIZE/2 + Math.sin(menuCamAngle) * 1200;
+                camera.zoom = 0.5;
             }
 
             if (gameActive && player.hp <= 0) { 
-                gameActive = false; totalCoins += Math.floor(player.totalXp/10); localStorage.setItem('sb_coins', totalCoins);
-                document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; gameOverScreen.style.display = 'flex'; 
+                gameActive = false; 
+                let earned = Math.floor(player.totalXp/10);
+                totalCoins += earned; 
+                localStorage.setItem('sb_coins', totalCoins);
+                document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; 
+                gameOverScreen.style.display = 'flex'; 
             }
 
+            const entities = gameActive ? [player, ...bots] : bots;
+            
             if (gameActive) {
                 camera.zoom += ((1/(1+(player.tier-1)*0.04)) - camera.zoom)*0.1;
                 camera.x += (player.x - camera.x)*0.1; camera.y += (player.y - camera.y)*0.1;
@@ -314,9 +316,7 @@
                 checkStealth(player);
             }
 
-            const entities = gameActive ? [player, ...bots] : bots;
-            
-            // Fixed Knockback & Damage Processing
+            // Damage and Knockback
             entities.forEach(atk => {
                 if (!atk.isAttacking) return;
                 entities.forEach(vic => {
@@ -325,10 +325,8 @@
                     if (dist < 145 * atk.scale) {
                         let dmg = Math.floor(20 * atk.scale); vic.hp -= dmg;
                         atk.hitList.add(vic.id);
-                        // Apply Knockback Force
                         const knockAngle = Math.atan2(vic.y - atk.y, vic.x - atk.x);
-                        vic.kx = Math.cos(knockAngle) * 20;
-                        vic.ky = Math.sin(knockAngle) * 20;
+                        vic.kx = Math.cos(knockAngle) * 22; vic.ky = Math.sin(knockAngle) * 22;
                         addDamageText(vic.x, vic.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
                         if (vic.hp <= 0) { atk.kills++; atk.xp += 100*vic.tier; if(atk.isPlayer) kills++; }
                     }
@@ -345,7 +343,7 @@
                     bot.angle = Math.atan2(target.y-bot.y, target.x-bot.x);
                     bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
                     if (dMin < 150*bot.scale && !bot.isAttacking && bot.attackCooldown <= 0) { 
-                        bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 45; 
+                        bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 50; 
                     }
                 } else if (coinTarget) {
                     bot.angle = Math.atan2(coinTarget.y-bot.y, coinTarget.x-bot.x);
@@ -387,12 +385,13 @@
             ctx.save(); ctx.translate(w/2, h/2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE, WORLD_SIZE);
             
+            // Background patterns
             const time = Date.now() * 0.002;
-            if(document.getElementById('worldSelect').value === 'lava') {
+            if(currentTheme === themes.lava) {
                 for(let x=0; x<WORLD_SIZE; x+=300) for(let y=0; y<WORLD_SIZE; y+=300) {
                     ctx.fillStyle = `rgba(255, 69, 0, ${0.08 + Math.sin(time + (x+y)*0.01)*0.04})`; ctx.fillRect(x, y, 220, 220);
                 }
-            } else if(document.getElementById('worldSelect').value === 'ocean') {
+            } else if(currentTheme === themes.ocean) {
                 for(let x=0; x<WORLD_SIZE; x+=400) for(let y=0; y<WORLD_SIZE; y+=400) {
                     ctx.fillStyle = `rgba(0, 119, 190, ${0.15 + Math.cos(time*0.5 + x*0.01)*0.08})`;
                     ctx.beginPath(); ctx.arc(x, y, 160 + Math.sin(time)*30, 0, Math.PI*2); ctx.fill();
@@ -416,13 +415,16 @@
             ctx.restore();
             
             if (gameActive) {
-                miniCtx.fillStyle = 'rgba(0,0,0,0.8)'; miniCtx.fillRect(0,0,150,150);
-                // Fixed Minimap Scale: 150 (map width) / 6000 (world size)
+                // Clear Minimap and draw at perfect 150/6000 scale
+                miniCtx.clearRect(0,0,150,150);
                 const s = 150 / WORLD_SIZE;
-                miniCtx.fillStyle = 'red'; bots.forEach(b => { if(!b.hidden) miniCtx.fillRect(b.x*s, b.y*s, 3, 3); });
+                miniCtx.fillStyle = 'red'; bots.forEach(b => { if(!b.hidden) miniCtx.fillRect(b.x*s-1, b.y*s-1, 3, 3); });
                 miniCtx.fillStyle = '#00e676'; miniCtx.fillRect(player.x*s-2, player.y*s-2, 5, 5);
-                document.getElementById('xp-display').innerText = `Lvl Progress: ${Math.floor(player.xp)} / ${player.nextLevel}`;
+                
+                // UI Updates
+                document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
+                document.getElementById('ingame-coins').innerText = "Coins: " + Math.floor(player.totalXp/10);
             }
             requestAnimationFrame(draw);
         }
