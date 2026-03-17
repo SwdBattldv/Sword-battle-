@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sword Battle | Polished Edition</title>
+    <title>Sword Battle | Fixed Minimap & Knockback</title>
     <style>
         :root { --primary: #00e676; --accent: #ffd700; --bg-dark: #1a1a1a; }
         body, html { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; }
         canvas { display: block; width: 100vw; height: 100vh; }
         
-        /* Polished UI Overlays */
         #menu, #game-over, #shop-menu { 
             position: absolute; inset: 0; 
             background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.8) 100%); 
@@ -32,16 +31,13 @@
             50% { transform: translateY(-10px); }
         }
 
-        /* Shop Button Top Right */
         #openShopBtn { 
             position: absolute; top: 25px; right: 25px; 
             padding: 12px 24px; background: var(--accent); 
             color: #000; border-radius: 14px; font-weight: 900; 
             border: none; cursor: pointer; z-index: 2501;
             box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-            transition: transform 0.2s;
         }
-        #openShopBtn:active { transform: scale(0.9); }
 
         .shop-container { width: 90%; max-width: 420px; max-height: 80vh; background: #222; border-radius: 24px; border: 2px solid #444; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
         .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; overflow-y: auto; padding: 10px; }
@@ -49,35 +45,25 @@
             background: #2a2a2a; padding: 15px; border-radius: 18px; 
             border: 2px solid #3d3d3d; cursor: pointer; 
             display: flex; flex-direction: column; align-items: center; 
-            transition: 0.3s;
         }
         .shop-item.owned { border-color: var(--primary); }
         .shop-item.selected { background: #333; border-color: #2196f3; box-shadow: 0 0 20px rgba(33, 150, 243, 0.3); }
         
         .preview-canvas { width: 90px; height: 90px; margin: 10px 0; }
+        .coin-count { color: var(--accent); font-weight: bold; font-size: 20px; margin-bottom: 15px; }
+        input, select { width: 90%; padding: 12px; margin-bottom: 12px; border-radius: 10px; border: 1px solid #444; background: #111; color: white; }
         
-        .coin-count { color: var(--accent); font-weight: bold; font-size: 20px; margin-bottom: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        input, select { 
-            width: 90%; padding: 12px; margin-bottom: 12px; border-radius: 10px; 
-            border: 1px solid #444; background: #111; color: white; outline: none;
-        }
-        
-        button.main-btn { 
-            width: 95%; padding: 15px; margin-top: 10px; border-radius: 12px; border: none; 
-            font-size: 18px; background: var(--primary); font-weight: bold; 
-            cursor: pointer; color: #000; transition: 0.2s;
-        }
-        button.main-btn:hover { filter: brightness(1.1); }
+        button.main-btn { width: 95%; padding: 15px; margin-top: 10px; border-radius: 12px; border: none; font-size: 18px; background: var(--primary); font-weight: bold; cursor: pointer; color: #000; }
 
         #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.6); padding: 15px 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px); display: none; z-index: 1000; }
         #right-ui { position: absolute; top: 20px; right: 20px; display: none; flex-direction: column; gap: 15px; z-index: 1000; }
         #minimap-container { width: 150px; height: 150px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; overflow: hidden; }
         #leaderboard { width: 150px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; color: white; font-size: 12px; }
         
-        .touch-ctrl { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); display: none; z-index: 1500; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .touch-ctrl { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); display: none; z-index: 1500; align-items: center; justify-content: center; }
         #joystick-base { bottom: 50px; left: 50px; width: 120px; height: 120px; }
         #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; opacity: 0.4; }
-        #dash-btn { bottom: 170px; right: 50px; width: 70px; height: 70px; color: white; font-weight: bold; font-size: 12px; }
+        #dash-btn { bottom: 170px; right: 50px; width: 70px; height: 70px; color: white; font-weight: bold; }
         #atk-btn { bottom: 40px; right: 40px; width: 110px; height: 110px; background: rgba(255, 23, 68, 0.3); border-color: rgba(255,23,68,0.5); color: white; font-weight: bold; }
     </style>
 </head>
@@ -100,26 +86,26 @@
 
     <div id="shop-menu">
         <div class="shop-container">
-            <h2 style="margin:0; color:var(--accent); text-align:center; letter-spacing: 2px;">SKINS</h2>
+            <h2 style="margin:0; color:var(--accent); text-align:center;">SKINS</h2>
             <div id="shop-coin-display" class="coin-count" style="text-align:center;">Coins: 0</div>
             <div class="shop-grid" id="shop-grid"></div>
-            <button id="closeShopBtn" style="background:#444; color:white; border:none; padding:12px; border-radius:10px; margin-top:10px; font-weight:bold;">CLOSE</button>
+            <button id="closeShopBtn" style="background:#444; color:white; border:none; padding:12px; border-radius:10px; margin-top:10px;">CLOSE</button>
         </div>
     </div>
 
     <div id="game-over">
         <div class="menu-box">
-            <h1 style="color:#ff1744; margin-top:0;">DEFEATED</h1>
-            <p id="final-stats" style="font-size:18px; opacity:0.8;">Kills: 0 | Tier: 1</p>
+            <h1 style="color:#ff1744">DEFEATED</h1>
+            <p id="final-stats">Kills: 0 | Tier: 1</p>
             <button id="respawnBtn" class="main-btn">REMATCH</button>
             <button id="menuBtn" style="background:transparent; color:white; border:1px solid #555; width:95%; padding:12px; margin-top:10px; border-radius:10px;">HOME</button>
         </div>
     </div>
 
     <div id="ui">
-        <div id="ui-name" style="font-weight:900; color:var(--primary); margin-bottom:4px;">Player</div>
+        <div id="ui-name" style="font-weight:900; color:var(--primary);">Player</div>
         <div id="xp-display" style="font-size:12px; opacity:0.8;">Lvl Progress</div>
-        <div id="score" style="font-size:14px; font-weight:bold; margin-top:5px; color:var(--accent);">Kills: 0</div>
+        <div id="score" style="font-size:14px; font-weight:bold; color:var(--accent);">Kills: 0</div>
     </div>
 
     <div id="right-ui">
@@ -149,11 +135,8 @@
         const WORLD_SIZE = 6000; 
         const camera = { x: WORLD_SIZE/2, y: WORLD_SIZE/2, zoom: 0.8 };
         const bushes = [], bots = [], xpGems = [], damageTexts = [];
-
-        // Camera move vars for menu
         let menuCamAngle = 0;
 
-        // --- SHOP DATA ---
         let totalCoins = parseInt(localStorage.getItem('sb_coins')) || 0;
         let ownedSkins = JSON.parse(localStorage.getItem('sb_owned')) || ['Default'];
         let selectedSkinName = localStorage.getItem('sb_selected') || 'Default';
@@ -169,43 +152,27 @@
         function updateShopUI() {
             document.getElementById('menu-coins').innerText = `Coins: ${totalCoins}`;
             document.getElementById('shop-coin-display').innerText = `Coins: ${totalCoins}`;
-            const grid = document.getElementById('shop-grid');
-            grid.innerHTML = '';
-            
+            const grid = document.getElementById('shop-grid'); grid.innerHTML = '';
             Object.keys(skins).forEach(name => {
-                const s = skins[name];
-                const isOwned = ownedSkins.includes(name);
-                const isSelected = selectedSkinName === name;
-                
+                const s = skins[name]; const isOwned = ownedSkins.includes(name); const isSelected = selectedSkinName === name;
                 const item = document.createElement('div');
                 item.className = `shop-item ${isOwned ? 'owned' : ''} ${isSelected ? 'selected' : ''}`;
-                const pcvs = document.createElement('canvas');
-                pcvs.width = 100; pcvs.height = 100; pcvs.className = 'preview-canvas';
-                
-                item.innerHTML = `<div style="font-weight:bold; font-size:14px; color:#fff;">${name}</div>`;
+                const pcvs = document.createElement('canvas'); pcvs.width = 100; pcvs.height = 100; pcvs.className = 'preview-canvas';
+                item.innerHTML = `<div style="font-weight:bold; font-size:14px;">${name}</div>`;
                 item.appendChild(pcvs);
                 item.innerHTML += `<div style="font-size:12px; color:var(--accent); font-weight:bold;">${isOwned ? (isSelected ? 'EQUIPPED' : 'OWNED') : s.price}</div>`;
-                
                 item.onclick = () => {
                     if (isOwned) { selectedSkinName = name; localStorage.setItem('sb_selected', name); }
-                    else if (totalCoins >= s.price) {
-                        totalCoins -= s.price; ownedSkins.push(name); selectedSkinName = name;
-                        localStorage.setItem('sb_coins', totalCoins); localStorage.setItem('sb_owned', JSON.stringify(ownedSkins)); localStorage.setItem('sb_selected', name);
-                    }
+                    else if (totalCoins >= s.price) { totalCoins -= s.price; ownedSkins.push(name); selectedSkinName = name; localStorage.setItem('sb_coins', totalCoins); localStorage.setItem('sb_owned', JSON.stringify(ownedSkins)); localStorage.setItem('sb_selected', name); }
                     updateShopUI();
                 };
                 grid.appendChild(item);
-
                 const pctx = pcvs.getContext('2d');
                 setTimeout(() => {
-                    pctx.clearRect(0,0,100,100);
-                    pctx.translate(50, 50);
+                    pctx.clearRect(0,0,100,100); pctx.translate(50, 50);
                     pctx.beginPath(); pctx.arc(0, 0, 22, 0, Math.PI*2); pctx.fillStyle = s.color; pctx.fill();
-                    pctx.strokeStyle = "rgba(0,0,0,0.3)"; pctx.lineWidth = 3; pctx.stroke();
-                    pctx.rotate(-0.4);
-                    pctx.fillStyle = s.hilt; pctx.fillRect(12, -4, 12, 8);
-                    pctx.fillStyle = s.sword; pctx.beginPath();
-                    pctx.moveTo(24, -10); pctx.lineTo(70, -2); pctx.lineTo(70, 2); pctx.lineTo(24, 10); pctx.fill();
+                    pctx.rotate(-0.4); pctx.fillStyle = s.hilt; pctx.fillRect(12, -4, 12, 8);
+                    pctx.fillStyle = s.sword; pctx.beginPath(); pctx.moveTo(24, -10); pctx.lineTo(70, -2); pctx.lineTo(70, 2); pctx.lineTo(24, 10); pctx.fill();
                 }, 20);
             });
         }
@@ -213,7 +180,6 @@
         document.getElementById('openShopBtn').onclick = () => { menu.style.display = 'none'; shopMenu.style.display = 'flex'; updateShopUI(); };
         document.getElementById('closeShopBtn').onclick = () => { shopMenu.style.display = 'none'; menu.style.display = 'flex'; };
 
-        // --- GAME LOGIC ---
         const themes = {
             grass: { bg: '#235e27', sec: '#1d4d20', gem: '#ffd700', bush: 'rgba(25, 80, 25, 0.7)' },
             lava: { bg: '#2b0a08', sec: '#ff4500', gem: '#ffab00', bush: 'rgba(40, 10, 5, 0.8)' },
@@ -230,7 +196,7 @@
 
         function findSafeSpawn() {
             for(let i=0; i<50; i++){
-                let tx = Math.random() * (WORLD_SIZE-400)+200, ty = Math.random() * (WORLD_SIZE-400)+200;
+                let tx = Math.random() * (WORLD_SIZE-800)+400, ty = Math.random() * (WORLD_SIZE-800)+400;
                 if(!bots.some(b => Math.hypot(tx-b.x, ty-b.y) < 700)) return {x:tx, y:ty};
             }
             return {x: WORLD_SIZE/2, y: WORLD_SIZE/2};
@@ -262,10 +228,8 @@
 
         function resetPlayer() {
             const safe = findSafeSpawn();
-            player.x = safe.x; player.y = safe.y;
-            player.hp = 150; player.maxHp = 150; player.xp = 0; player.tier = 1;
-            player.scale = 1; player.radius = 30; player.nextLevel = 100;
-            player.totalXp = 0; player.kills = 0; kills = 0; player.trail = [];
+            player.x = safe.x; player.y = safe.y; player.hp = 150; player.maxHp = 150; player.xp = 0; player.tier = 1;
+            player.scale = 1; player.radius = 30; player.nextLevel = 100; player.totalXp = 0; player.kills = 0; kills = 0; player.trail = [];
         }
 
         document.getElementById('respawnBtn').onclick = () => { gameOverScreen.style.display = 'none'; resetPlayer(); gameActive = true; };
@@ -274,22 +238,12 @@
         function spawnGem(x, y, value) { xpGems.push({ x: x || Math.random()*WORLD_SIZE, y: y || Math.random()*WORLD_SIZE, val: value || 15, size: 5 + Math.random()*5 }); }
         function addDamageText(x, y, text, color) { damageTexts.push({ x, y, text, color, life: 1.0, vx: (Math.random()-0.5)*2, vy: -2 }); }
 
-        // Dash Logic: Lock direction
-        function triggerDash() {
-            if(player.dashCooldown <= 0 && gameActive) {
-                player.dashTimer = 18;
-                player.dashCooldown = 65;
-                player.dashAngle = player.angle; // Lock direction
-            }
-        }
-
-        // Input Setup
         joyBase.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyState.active = true; joyState.id = t.identifier; updateJoy(t); e.preventDefault(); }, {passive: false});
         window.addEventListener('touchmove', (e) => { if (!joyState.active) return; for(let i=0; i<e.changedTouches.length; i++){ if(e.changedTouches[i].identifier === joyState.id){ updateJoy(e.changedTouches[i]); e.preventDefault(); }}}, {passive: false});
         function updateJoy(t){ const r = joyBase.getBoundingClientRect(); const dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2); const dist = Math.min(50, Math.hypot(dx, dy)), a = Math.atan2(dy, dx); joyState.x = (Math.cos(a) * dist) / 50; joyState.y = (Math.sin(a) * dist) / 50; joyStick.style.transform = `translate(${joyState.x * 30}px, ${joyState.y * 30}px)`; }
         window.addEventListener('touchend', (e) => { for(let i=0; i<e.changedTouches.length; i++){ if(e.changedTouches[i].identifier === joyState.id){ joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; }}});
         document.getElementById('atk-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(!player.isAttacking && gameActive) { player.isAttacking = true; player.swingProgress = 0; player.hitList.clear(); }}, {passive: false});
-        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { e.preventDefault(); triggerDash(); }, {passive: false});
+        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(player.dashCooldown <= 0 && gameActive) { player.dashTimer = 18; player.dashCooldown = 65; player.dashAngle = player.angle; }}, {passive: false});
 
         function resolveCollision(a, b) { if (a.dashTimer > 0 || b.dashTimer > 0) return; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy), min = a.radius + b.radius; if (dist < min && dist > 0) { const overlap = (min - dist) / 2; a.x -= (dx/dist)*overlap; a.y -= (dy/dist)*overlap; b.x += (dx/dist)*overlap; b.y += (dy/dist)*overlap; }}
         function checkStealth(ent) { ent.hidden = false; for(let b of bushes) { for(let p of b.parts) { if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.8) { ent.hidden = true; return; }}}}
@@ -306,7 +260,7 @@
             if(!e.hidden || (e.isPlayer)) {
                 const barW = 60 * e.scale;
                 ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(-barW/2, -62 * e.scale, barW, 8 * e.scale);
-                ctx.fillStyle = e.isPlayer ? varName('--primary') : '#ff1744';
+                ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff1744';
                 ctx.fillRect(-barW/2, -60 * e.scale, barW * (e.hp/e.maxHp), 4 * e.scale);
             }
             ctx.rotate(e.angle); ctx.save();
@@ -330,11 +284,8 @@
             ctx.restore();
         }
 
-        function varName(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-
         function update() {
             if (menuActive) {
-                // Menu Cinematic Glide
                 menuCamAngle += 0.002;
                 camera.x = WORLD_SIZE/2 + Math.cos(menuCamAngle) * 1000;
                 camera.y = WORLD_SIZE/2 + Math.sin(menuCamAngle) * 1000;
@@ -345,20 +296,16 @@
                 gameActive = false; totalCoins += Math.floor(player.totalXp/10); localStorage.setItem('sb_coins', totalCoins);
                 document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; gameOverScreen.style.display = 'flex'; 
             }
+
             if (gameActive) {
                 camera.zoom += ((1/(1+(player.tier-1)*0.04)) - camera.zoom)*0.1;
                 camera.x += (player.x - camera.x)*0.1; camera.y += (player.y - camera.y)*0.1;
-                
                 let speed = (player.speed - (player.tier*0.05));
                 if (player.dashTimer > 0) {
-                    player.x += Math.cos(player.dashAngle) * 18;
-                    player.y += Math.sin(player.dashAngle) * 18;
+                    player.x += Math.cos(player.dashAngle) * 18; player.y += Math.sin(player.dashAngle) * 18;
                     player.dashTimer--;
-                } else {
-                    if (joyState.active) { 
-                        player.x += joyState.x*speed; player.y += joyState.y*speed; 
-                        player.angle = Math.atan2(joyState.y, joyState.x); 
-                    }
+                } else if (joyState.active) { 
+                    player.x += joyState.x*speed; player.y += joyState.y*speed; player.angle = Math.atan2(joyState.y, joyState.x); 
                 }
                 player.x += player.kx; player.y += player.ky; player.kx *= 0.85; player.ky *= 0.85;
                 player.x = Math.max(player.radius, Math.min(WORLD_SIZE-player.radius, player.x));
@@ -368,17 +315,24 @@
             }
 
             const entities = gameActive ? [player, ...bots] : bots;
-            entities.forEach(ent => {
-                for (let i = xpGems.length-1; i >= 0; i--) {
-                    if (Math.hypot(ent.x - xpGems[i].x, ent.y - xpGems[i].y) < ent.radius+15) {
-                        ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val; xpGems.splice(i, 1);
-                        if (xpGems.length < 150) spawnGem();
+            
+            // Fixed Knockback & Damage Processing
+            entities.forEach(atk => {
+                if (!atk.isAttacking) return;
+                entities.forEach(vic => {
+                    if (atk.id === vic.id || atk.hitList.has(vic.id)) return;
+                    const dist = Math.hypot(atk.x-vic.x, atk.y-vic.y);
+                    if (dist < 145 * atk.scale) {
+                        let dmg = Math.floor(20 * atk.scale); vic.hp -= dmg;
+                        atk.hitList.add(vic.id);
+                        // Apply Knockback Force
+                        const knockAngle = Math.atan2(vic.y - atk.y, vic.x - atk.x);
+                        vic.kx = Math.cos(knockAngle) * 20;
+                        vic.ky = Math.sin(knockAngle) * 20;
+                        addDamageText(vic.x, vic.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
+                        if (vic.hp <= 0) { atk.kills++; atk.xp += 100*vic.tier; if(atk.isPlayer) kills++; }
                     }
-                }
-                if (ent.xp >= ent.nextLevel) {
-                    ent.tier++; ent.xp -= ent.nextLevel; ent.nextLevel = Math.floor(ent.nextLevel * 1.8);
-                    ent.scale += 0.12; ent.radius = 30 * ent.scale; ent.maxHp += 40; ent.hp = ent.maxHp;
-                }
+                });
             });
 
             bots.forEach((bot, idx) => {
@@ -390,9 +344,8 @@
                 if (target && dMin < 250*bot.scale) {
                     bot.angle = Math.atan2(target.y-bot.y, target.x-bot.x);
                     bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
-                    // Lowered bot attack speed (cooldown)
                     if (dMin < 150*bot.scale && !bot.isAttacking && bot.attackCooldown <= 0) { 
-                        bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 40; 
+                        bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 45; 
                     }
                 } else if (coinTarget) {
                     bot.angle = Math.atan2(coinTarget.y-bot.y, coinTarget.x-bot.x);
@@ -403,28 +356,29 @@
                     bot.angle = bot.wanderAngle; bot.wanderTime--;
                 }
                 if (bot.attackCooldown > 0) bot.attackCooldown--;
-
-                entities.forEach(atk => {
-                    if (atk !== bot && atk.isAttacking && !atk.hitList.has(bot.id) && Math.hypot(atk.x-bot.x, atk.y-bot.y) < 145*atk.scale) {
-                        let dmg = Math.floor(20*atk.scale); bot.hp -= dmg; atk.hitList.add(bot.id);
-                        bot.kx = Math.cos(Math.atan2(bot.y-atk.y, bot.x-atk.x))*18; bot.ky = Math.sin(Math.atan2(bot.y-atk.y, bot.x-atk.x))*18;
-                        addDamageText(bot.x, bot.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
-                        if (bot.hp <= 0) { atk.kills++; atk.xp += 100*bot.tier; if(atk.isPlayer) kills++; }
-                    }
-                });
-                
-                if (gameActive && bot.isAttacking && !bot.hitList.has('player') && Math.hypot(bot.x-player.x, bot.y-player.y) < 130*bot.scale) {
-                    let dmg = Math.floor(20*bot.scale); player.hp -= dmg; bot.hitList.add('player');
-                    addDamageText(player.x, player.y, dmg, "#ff1744");
-                    player.kx = Math.cos(Math.atan2(player.y-bot.y, player.x-bot.x))*12; player.ky = Math.sin(Math.atan2(player.y-bot.y, player.x-bot.x))*12;
-                }
+                bot.x += bot.kx; bot.y += bot.ky; bot.kx *= 0.85; bot.ky *= 0.85;
+                bot.x = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.x));
+                bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.y));
                 entities.forEach(other => { if(bot !== other) resolveCollision(bot, other); });
                 if (bot.hp <= 0) { for(let i=0; i<6; i++) spawnGem(bot.x, bot.y, 35); bots.splice(idx, 1); spawnBot(); }
             });
 
+            entities.forEach(ent => {
+                for (let i = xpGems.length-1; i >= 0; i--) {
+                    if (Math.hypot(ent.x - xpGems[i].x, ent.y - xpGems[i].y) < ent.radius+15) {
+                        ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val; xpGems.splice(i, 1);
+                        if (xpGems.length < 160) spawnGem();
+                    }
+                }
+                if (ent.xp >= ent.nextLevel) {
+                    ent.tier++; ent.xp -= ent.nextLevel; ent.nextLevel = Math.floor(ent.nextLevel * 1.8);
+                    ent.scale += 0.12; ent.radius = 30 * ent.scale; ent.maxHp += 40; ent.hp = ent.maxHp;
+                }
+            });
+
             for (let i = damageTexts.length-1; i >= 0; i--) { damageTexts[i].y += damageTexts[i].vy; damageTexts[i].life -= 0.02; if(damageTexts[i].life <= 0) damageTexts.splice(i, 1); }
             const ranked = [player, ...bots].sort((a,b)=>b.totalXp - a.totalXp).slice(0, 5);
-            lbList.innerHTML = ranked.map((e,i)=>`<div style="display:flex; justify-content:space-between; margin-bottom:4px; ${e.isPlayer?'color:var(--primary);font-weight:900;':''}"><span>${i+1}. ${e.name}</span><span>${Math.floor(e.totalXp/10)}</span></div>`).join('');
+            lbList.innerHTML = ranked.map((e,i)=>`<div style="display:flex; justify-content:space-between; ${e.isPlayer?'color:var(--primary);font-weight:900;':''}"><span>${i+1}. ${e.name}</span><span>${Math.floor(e.totalXp/10)}</span></div>`).join('');
         }
 
         function draw() {
@@ -447,40 +401,32 @@
                 ctx.fillStyle = currentTheme.sec;
                 for(let x=0; x<WORLD_SIZE; x+=200) for(let y=0; y<WORLD_SIZE; y+=200) if((x+y)%400 === 0) ctx.fillRect(x, y, 80, 80);
             }
-
-            ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 2;
-            for(let x=0; x<=WORLD_SIZE; x+=250) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke(); }
-            for(let y=0; y<=WORLD_SIZE; y+=250) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke(); }
             
             ctx.fillStyle = currentTheme.gem; 
-            xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.stroke(); });
-            
+            xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill(); });
             bots.forEach(b => drawBody(b, b.x, b.y));
             if (gameActive && player.hp > 0) {
                 if(player.dashTimer > 0) { ctx.globalAlpha = 0.3; drawBody(player, player.x-Math.cos(player.dashAngle)*40, player.y-Math.sin(player.dashAngle)*40); ctx.globalAlpha = 1; }
                 drawBody(player, player.x, player.y);
             }
-            
             ctx.fillStyle = currentTheme.bush; 
             bushes.forEach(b => b.parts.forEach(p => { ctx.beginPath(); ctx.arc(b.x+p.ox, b.y+p.oy, p.r, 0, Math.PI*2); ctx.fill(); }));
-
             damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = d.life; ctx.fillStyle = d.color; ctx.font = "bold 32px Arial"; ctx.textAlign = "center"; ctx.fillText(d.text, d.x, d.y); ctx.restore(); });
             ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 20; ctx.strokeRect(0,0,WORLD_SIZE, WORLD_SIZE);
             ctx.restore();
             
             if (gameActive) {
                 miniCtx.fillStyle = 'rgba(0,0,0,0.8)'; miniCtx.fillRect(0,0,150,150);
+                // Fixed Minimap Scale: 150 (map width) / 6000 (world size)
                 const s = 150 / WORLD_SIZE;
                 miniCtx.fillStyle = 'red'; bots.forEach(b => { if(!b.hidden) miniCtx.fillRect(b.x*s, b.y*s, 3, 3); });
-                miniCtx.fillStyle = varName('--primary'); miniCtx.fillRect(player.x*s-2, player.y*s-2, 5, 5);
+                miniCtx.fillStyle = '#00e676'; miniCtx.fillRect(player.x*s-2, player.y*s-2, 5, 5);
                 document.getElementById('xp-display').innerText = `Lvl Progress: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
             }
             requestAnimationFrame(draw);
         }
         window.onresize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
-        
-        // Init world
         for(let i=0; i<60; i++) {
             let bx = Math.random()*WORLD_SIZE, by = Math.random()*WORLD_SIZE, parts = [];
             for(let p=0; p<7; p++) parts.push({ ox: (Math.random()-0.5)*180, oy: (Math.random()-0.5)*180, r: 70 + Math.random()*80 });
@@ -488,9 +434,7 @@
         }
         for(let i=0; i<35; i++) spawnBot();
         for(let i=0; i<160; i++) spawnGem();
-        
         draw();
-        updateShopUI();
     </script>
 </body>
 </html>
