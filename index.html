@@ -3,40 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SwordsBattle.io | Worlds Edition</title>
+    <title>SwordsBattle.io | Fixed Edition</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
         
-        /* Menu Styling */
         #menu {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+            position: absolute; inset: 0; background: rgba(0,0,0,0.9);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 100; color: white; text-align: center;
+            z-index: 100; color: white;
         }
-        .menu-box { background: #222; padding: 30px; border-radius: 20px; border: 2px solid #444; width: 300px; }
-        input { padding: 12px; border-radius: 8px; border: none; width: 80%; margin: 10px 0; font-size: 16px; }
-        select { padding: 12px; border-radius: 8px; width: 88%; margin: 10px 0; background: #333; color: white; border: 1px solid #555; }
-        button { padding: 15px 30px; border-radius: 8px; border: none; background: #00e676; color: black; font-weight: bold; cursor: pointer; width: 88%; font-size: 18px; }
-        button:hover { background: #00c853; }
+        .menu-box { background: #222; padding: 30px; border-radius: 20px; border: 2px solid #444; width: 280px; text-align: center; }
+        input, select, button { width: 90%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; font-size: 16px; }
+        button { background: #00e676; font-weight: bold; cursor: pointer; }
 
         #ui {
             position: absolute; top: 10px; left: 10px; color: white;
             background: rgba(0,0,0,0.6); padding: 12px; border-radius: 12px; 
-            pointer-events: none; border: 2px solid rgba(255,255,255,0.1); z-index: 10; display: none;
+            pointer-events: none; z-index: 10; display: none;
         }
         #minimap {
             position: absolute; top: 10px; right: 10px; width: 120px; height: 120px;
             background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.2); border-radius: 8px; z-index: 10; display: none;
         }
+
+        /* Mobile Controls */
         .touch-ctrl {
             position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.2); 
-            border: 2px solid rgba(255, 255, 255, 0.4); display: none; user-select: none; z-index: 20;
+            border: 2px solid rgba(255, 255, 255, 0.4); display: none; z-index: 50; touch-action: none;
         }
-        #joystick-base { bottom: 40px; left: 40px; width: 100px; height: 100px; }
-        #joystick-stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: rgba(255, 255, 255, 0.6); border-radius: 50%; }
-        #dash-btn { bottom: 130px; right: 40px; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
-        #atk-btn { bottom: 40px; right: 40px; width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; background: rgba(255, 0, 0, 0.3); }
+        #joystick-base { bottom: 50px; left: 50px; width: 100px; height: 100px; }
+        #joystick-stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: white; border-radius: 50%; opacity: 0.5; }
+        #dash-btn { bottom: 140px; right: 50px; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        #atk-btn { bottom: 40px; right: 40px; width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; background: rgba(255, 0, 0, 0.4); }
     </style>
 </head>
 <body>
@@ -44,22 +43,23 @@
     <div id="menu">
         <div class="menu-box">
             <h1>SWORDS BATTLE</h1>
-            <input type="text" id="username" placeholder="Enter Name..." maxlength="12">
+            <input type="text" id="username" placeholder="Name..." maxlength="10">
             <select id="worldSelect">
                 <option value="grass">Grassy Plains</option>
                 <option value="lava">Volcanic Ember</option>
                 <option value="ocean">Deep Ocean</option>
             </select>
-            <button id="startBtn">JOIN GAME</button>
+            <button id="startBtn">START GAME</button>
         </div>
     </div>
 
     <div id="ui">
-        <h2 id="ui-name" style="margin:0; font-size: 18px; color: #a5d6a7;">Player</h2>
+        <h2 id="ui-name" style="margin:0; font-size: 16px;">Player</h2>
         <div id="score">Kills: 0</div>
     </div>
 
     <canvas id="minimap"></canvas>
+    
     <div id="joystick-base" class="touch-ctrl"><div id="joystick-stick"></div></div>
     <div id="dash-btn" class="touch-ctrl">DASH</div>
     <div id="atk-btn" class="touch-ctrl">SWING</div>
@@ -72,64 +72,64 @@
         const mCanvas = document.getElementById('minimap');
         const mCtx = mCanvas.getContext('2d');
         
-        // UI Elements
         const menu = document.getElementById('menu');
-        const startBtn = document.getElementById('startBtn');
         const uiLayer = document.getElementById('ui');
-        const scoreElement = document.getElementById('score');
+        const joyBase = document.getElementById('joystick-base');
+        const joyStick = document.getElementById('joystick-stick');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         let gameActive = false;
         let kills = 0;
+        let isTouch = false;
         const keys = {};
         const mouse = { x: 0, y: 0 };
-        let isTouch = false;
         const joyState = { x: 0, y: 0, active: false };
 
-        const WORLD_SIZE = 3000; 
-        const BOT_COUNT = 15;
+        const WORLD_SIZE = 3000;
         const camera = { x: 0, y: 0 };
         const bushes = [];
+        let bots = [];
 
-        // World Themes
         const themes = {
-            grass: { bg: '#4caf50', alt: '#43a047', bush: 'rgba(13, 71, 16, 0.7)' },
-            lava: { bg: '#bf360c', alt: '#d84315', bush: 'rgba(62, 39, 35, 0.8)' },
-            ocean: { bg: '#0277bd', alt: '#0288d1', bush: 'rgba(0, 96, 100, 0.6)' }
+            grass: { bg: '#4caf50', alt: '#43a047', bush: 'rgba(13, 71, 16, 0.6)' },
+            lava: { bg: '#bf360c', alt: '#d84315', bush: 'rgba(46, 26, 20, 0.8)' },
+            ocean: { bg: '#0277bd', alt: '#0288d1', bush: 'rgba(0, 50, 60, 0.5)' }
         };
         let currentTheme = themes.grass;
 
-        function createEntity(x, y, color, isPlayer = false, name = "Bot") {
-            return {
-                x: x || Math.random() * WORLD_SIZE,
-                y: y || Math.random() * WORLD_SIZE,
-                radius: 24, color: color, name: name,
-                hp: 100, maxHp: 100, speed: isPlayer ? 5 : 2.5,
-                angle: 0, isPlayer: isPlayer,
-                isAttacking: false, swingAngle: 0,
-                dashTimer: 0, dashCooldown: 0,
-                vx: 0, vy: 0, isHidden: false
-            };
-        }
+        const player = {
+            x: WORLD_SIZE/2, y: WORLD_SIZE/2,
+            radius: 24, hp: 100, maxHp: 100,
+            color: '#2196f3', name: "Player",
+            speed: 5, angle: 0,
+            isAttacking: false, swingAngle: 0,
+            dashTimer: 0, dashCooldown: 0,
+            vx: 0, vy: 0, isHidden: false
+        };
 
-        let player = createEntity(WORLD_SIZE/2, WORLD_SIZE/2, '#2196f3', true);
-        let bots = [];
-
-        startBtn.onclick = () => {
-            const nameInput = document.getElementById('username').value;
-            player.name = nameInput || "Player";
+        // --- Start Game ---
+        document.getElementById('startBtn').onclick = () => {
+            player.name = document.getElementById('username').value || "Player";
             document.getElementById('ui-name').innerText = player.name;
             currentTheme = themes[document.getElementById('worldSelect').value];
             
-            // Initialize World
+            // Setup Map
             bushes.length = 0;
-            for(let i=0; i<25; i++) bushes.push({ x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, size: 100 });
+            for(let i=0; i<20; i++) bushes.push({ x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, size: 120 });
             
+            // Setup Bots
             bots = [];
-            const colors = ['#f44336', '#ff9800', '#9c27b0', '#e91e63'];
-            for (let i = 0; i < BOT_COUNT; i++) bots.push(createEntity(null, null, colors[i%4]));
+            const colors = ['#f44336', '#ff9800', '#9c27b0', '#ffeb3b'];
+            for(let i=0; i<12; i++) {
+                bots.push({
+                    x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE,
+                    radius: 24, hp: 100, maxHp: 100, color: colors[i%4],
+                    name: "Bot " + (i+1), speed: 2.5, angle: Math.random()*Math.PI*2,
+                    isAttacking: false, swingAngle: 0, vx: 0, vy: 0, isHidden: false
+                });
+            }
 
             menu.style.display = 'none';
             uiLayer.style.display = 'block';
@@ -142,17 +142,40 @@
         window.onkeyup = e => keys[e.code] = false;
         window.onmousedown = () => { if(gameActive && !isTouch) triggerAttack(player); };
         window.onmousemove = e => { mouse.x = e.clientX; mouse.y = e.clientY; };
-        
-        window.addEventListener('touchstart', () => { 
+
+        // Universal Touch Detection
+        window.addEventListener('touchstart', (e) => {
             if(!gameActive) return;
-            isTouch = true; 
-            document.querySelectorAll('.touch-ctrl').forEach(el => el.style.display = 'flex'); 
-        }, {once: true});
+            isTouch = true;
+            document.querySelectorAll('.touch-ctrl').forEach(el => el.style.display = 'flex');
+        });
+
+        // Joystick Logic
+        joyBase.addEventListener('touchstart', (e) => { joyState.active = true; e.preventDefault(); }, {passive: false});
+        window.addEventListener('touchmove', (e) => {
+            if (!joyState.active) return;
+            const t = e.touches[0];
+            const r = joyBase.getBoundingClientRect();
+            const dx = t.clientX - (r.left + r.width/2);
+            const dy = t.clientY - (r.top + r.height/2);
+            const d = Math.min(50, Math.hypot(dx, dy));
+            const a = Math.atan2(dy, dx);
+            joyState.x = Math.cos(a) * d / 50;
+            joyState.y = Math.sin(a) * d / 50;
+            joyStick.style.transform = `translate(${joyState.x * 50}px, ${joyState.y * 50}px)`;
+        });
+        window.addEventListener('touchend', () => { 
+            joyState.active = false; joyState.x = 0; joyState.y = 0; 
+            joyStick.style.transform = 'none'; 
+        });
+
+        document.getElementById('atk-btn').ontouchstart = (e) => { e.preventDefault(); triggerAttack(player); };
+        document.getElementById('dash-btn').ontouchstart = (e) => { e.preventDefault(); triggerDash(player); };
 
         function triggerAttack(e) { if (!e.isAttacking) { e.isAttacking = true; e.swingAngle = -1.2; } }
         function triggerDash(e) { if (e.dashCooldown <= 0) { e.dashTimer = 12; e.dashCooldown = 60; } }
 
-        // --- Logic ---
+        // --- Core Loop ---
         function update() {
             if(!gameActive) return;
 
@@ -160,12 +183,12 @@
             if (player.dashTimer > 0) player.dashTimer--;
             if (player.dashCooldown > 0) player.dashCooldown--;
 
-            // Move Player
+            // Movement
             let mx = 0, my = 0;
-            if (isTouch && joyState.active) {
+            if (isTouch) {
                 mx = joyState.x * pSpeed; my = joyState.y * pSpeed;
-                player.angle = Math.atan2(joyState.y, joyState.x);
-            } else if (!isTouch) {
+                if(joyState.active) player.angle = Math.atan2(joyState.y, joyState.x);
+            } else {
                 if (keys['KeyW']) my = -pSpeed; if (keys['KeyS']) my = pSpeed;
                 if (keys['KeyA']) mx = -pSpeed; if (keys['KeyD']) mx = pSpeed;
                 player.angle = Math.atan2((mouse.y + camera.y) - player.y, (mouse.x + camera.x) - player.x);
@@ -176,73 +199,40 @@
             camera.x = player.x - canvas.width / 2;
             camera.y = player.y - canvas.height / 2;
 
-            // Check Bush Stealth
+            // Combat & AI
             [player, ...bots].forEach(e => {
                 e.isHidden = false;
-                for(let b of bushes) {
-                    if (Math.hypot(e.x - b.x, e.y - b.y) < b.size/2) { e.isHidden = true; break; }
-                }
+                for(let b of bushes) if(Math.hypot(e.x-b.x, e.y-b.y) < b.size/2) e.isHidden = true;
             });
 
             bots.forEach((bot, i) => {
-                const dist = Math.hypot(player.x - bot.x, player.y - bot.y);
-                if (dist < 300 && !player.isHidden) {
+                const d = Math.hypot(player.x - bot.x, player.y - bot.y);
+                if (d < 300 && !player.isHidden) {
                     bot.angle = Math.atan2(player.y - bot.y, player.x - bot.x);
-                    if (dist < 80 && Math.random() < 0.05) triggerAttack(bot);
-                } else if (Math.random() < 0.01) {
-                    bot.angle = Math.random() * Math.PI * 2;
-                }
-                bot.x += Math.cos(bot.angle) * bot.speed + bot.vx;
-                bot.y += Math.sin(bot.angle) * bot.speed + bot.vy;
+                    if (d < 80 && Math.random() < 0.05) triggerAttack(bot);
+                } else if (Math.random() < 0.02) bot.angle += (Math.random()-0.5);
+
+                bot.x += Math.cos(bot.angle)*bot.speed + bot.vx;
+                bot.y += Math.sin(bot.angle)*bot.speed + bot.vy;
                 bot.vx *= 0.8; bot.vy *= 0.8;
 
-                checkCombat(player, bot); checkCombat(bot, player);
+                checkHit(player, bot); checkHit(bot, player);
 
-                if (bot.hp <= 0) {
-                    bots[i] = createEntity(null, null, bot.color);
-                    kills++; scoreElement.innerText = `Kills: ${kills}`;
-                }
+                if (bot.hp <= 0) { bots[i].x = Math.random()*WORLD_SIZE; bots[i].y = Math.random()*WORLD_SIZE; bots[i].hp = 100; kills++; document.getElementById('score').innerText = "Kills: " + kills; }
             });
 
-            if (player.hp <= 0) location.reload(); // Simple death reset
+            if (player.hp <= 0) location.reload();
         }
 
-        function checkCombat(attacker, target) {
-            if (!attacker.isAttacking) return;
-            const sAngle = attacker.angle + attacker.swingAngle;
-            const sx = attacker.x + Math.cos(sAngle) * 55, sy = attacker.y + Math.sin(sAngle) * 55;
-            if (Math.hypot(sx - target.x, sy - target.y) < target.radius + 15) {
-                target.hp -= 2;
-                const kDir = Math.atan2(target.y - attacker.y, target.x - attacker.x);
-                target.vx += Math.cos(kDir) * 10; target.vy += Math.sin(kDir) * 10;
+        function checkHit(atk, vic) {
+            if (!atk.isAttacking) return;
+            const sa = atk.angle + atk.swingAngle;
+            const sx = atk.x + Math.cos(sa)*55, sy = atk.y + Math.sin(sa)*55;
+            if (Math.hypot(sx - vic.x, sy - vic.y) < vic.radius + 15) {
+                vic.hp -= 2;
+                const kd = Math.atan2(vic.y - atk.y, vic.x - atk.x);
+                vic.vx += Math.cos(kd)*12; vic.vy += Math.sin(kd)*12;
             }
-        }
-
-        function draw() {
-            ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            if(!gameActive) { requestAnimationFrame(draw); return; }
-
-            ctx.save(); ctx.translate(-camera.x, -camera.y);
-            
-            // Draw Background
-            ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0, WORLD_SIZE, WORLD_SIZE);
-            ctx.fillStyle = currentTheme.alt;
-            for(let x=0; x<WORLD_SIZE; x+=160) for(let y=0; y<WORLD_SIZE; y+=160) ctx.fillRect(x,y,80,160);
-
-            // Draw Bots and Player (Layering fix: Entities first)
-            bots.forEach(drawEntity);
-            drawEntity(player);
-
-            // Draw Bushes (Top layer so they cover players)
-            ctx.fillStyle = currentTheme.bush;
-            bushes.forEach(b => {
-                ctx.beginPath(); ctx.arc(b.x, b.y, b.size/2, 0, Math.PI*2); ctx.fill();
-            });
-
-            ctx.restore();
-            update();
-            drawMinimap();
-            requestAnimationFrame(draw);
         }
 
         function drawEntity(e) {
@@ -250,52 +240,57 @@
             ctx.translate(e.x - camera.x, e.y - camera.y);
             ctx.globalAlpha = e.isHidden ? 0.4 : 1.0;
 
-            // HP Bar
-            ctx.fillStyle = '#333'; ctx.fillRect(-20, -40, 40, 5);
-            ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff5252';
-            ctx.fillRect(-20, -40, 40 * (e.hp/e.maxHp), 5);
+            // Bars
+            ctx.fillStyle = '#333'; ctx.fillRect(-20, -35, 40, 4);
+            ctx.fillStyle = e.isPlayer ? '#00e676' : 'red';
+            ctx.fillRect(-20, -35, 40 * (e.hp/e.maxHp), 4);
+            
+            ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(e.name, 0, -42);
 
-            // Name
-            ctx.fillStyle = 'white'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
-            ctx.fillText(e.name, 0, -45);
-
-            ctx.rotate(e.isPlayer && !isTouch ? Math.atan2((mouse.y + camera.y) - e.y, (mouse.x + camera.x) - e.x) : e.angle);
-
+            ctx.rotate(e.angle);
             // Sword
             ctx.save();
-            if (e.isAttacking) { ctx.rotate(e.swingAngle); e.swingAngle += 0.25; if (e.swingAngle > 1.2) e.isAttacking = false; }
-            ctx.fillStyle = '#eee'; ctx.fillRect(20, -4, 45, 8); 
+            if (e.isAttacking) { ctx.rotate(e.swingAngle); e.swingAngle += 0.25; if(e.swingAngle > 1.2) e.isAttacking = false; }
+            ctx.fillStyle = '#ddd'; ctx.fillRect(20, -3, 40, 6);
             ctx.restore();
 
             // Body
-            ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
-            ctx.fillStyle = e.color; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0,0,e.radius,0,Math.PI*2);
+            ctx.fillStyle = e.color; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
             ctx.restore();
-            ctx.globalAlpha = 1.0;
+            ctx.globalAlpha = 1;
         }
 
-        function drawMinimap() {
+        function draw() {
+            ctx.fillStyle = '#111'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            if(!gameActive) { requestAnimationFrame(draw); return; }
+
+            ctx.save(); ctx.translate(-camera.x, -camera.y);
+            ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE,WORLD_SIZE);
+            
+            // Grid
+            ctx.fillStyle = currentTheme.alt;
+            for(let x=0; x<WORLD_SIZE; x+=100) for(let y=0; y<WORLD_SIZE; y+=100) if((x+y)%200==0) ctx.fillRect(x,y,100,100);
+
+            // DRAW ORDER: Players -> Bushes (so bushes cover players)
+            bots.forEach(drawEntity);
+            drawEntity(player);
+
+            ctx.fillStyle = currentTheme.bush;
+            bushes.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.size/2, 0, Math.PI*2); ctx.fill(); });
+            
+            ctx.restore();
+            update();
+            
+            // Minimap
             mCtx.clearRect(0,0,120,120);
-            const s = 120/WORLD_SIZE;
-            mCtx.fillStyle = '#00e5ff'; mCtx.fillRect(player.x*s, player.y*s, 4, 4);
-            mCtx.fillStyle = 'red'; bots.forEach(b => mCtx.fillRect(b.x*s, b.y*s, 2, 2));
+            mCtx.fillStyle = '#00e5ff'; mCtx.fillRect(player.x*120/WORLD_SIZE, player.y*120/WORLD_SIZE, 4, 4);
+            
+            requestAnimationFrame(draw);
         }
 
-        // Mobile Logic
-        const joyBase = document.getElementById('joystick-base');
-        joyBase.ontouchstart = () => joyState.active = true;
-        window.ontouchmove = e => {
-            if (!joyState.active) return;
-            const t = e.touches[0]; const r = joyBase.getBoundingClientRect();
-            const dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2);
-            const d = Math.min(50, Math.hypot(dx,dy)); const a = Math.atan2(dy,dx);
-            joyState.x = Math.cos(a)*d/50; joyState.y = Math.sin(a)*d/50;
-            joyStick.style.transform = `translate(${joyState.x*50}px,${joyState.y*50}px)`;
-        };
-        window.ontouchend = () => { joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; };
-        document.getElementById('dash-btn').ontouchstart = e => { e.preventDefault(); triggerDash(player); };
-        document.getElementById('atk-btn').ontouchstart = e => { e.preventDefault(); triggerAttack(player); };
-
+        window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
         draw();
     </script>
 </body>
