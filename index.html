@@ -3,37 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sword Battle | Shop Update</title>
+    <title>Sword Battle | Pro Edition</title>
     <style>
         :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
-        body, html { 
-            margin: 0; padding: 0; 
-            overflow: hidden; 
-            background: #111; 
-            font-family: 'Segoe UI', sans-serif; 
-            touch-action: none;
-            position: fixed; 
-            width: 100%; height: 100%;
-        }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; }
         canvas { display: block; width: 100vw; height: 100vh; }
         
-        #menu, #game-over, #shop-menu {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.6);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 2000; color: white; backdrop-filter: blur(4px);
-        }
-        #game-over, #shop-menu { display: none; background: rgba(0,0,0,0.85); }
-        .menu-box { background: #222; padding: 30px; border-radius: 20px; border: 2px solid #444; width: 300px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #menu, #game-over, #shop-menu { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; color: white; backdrop-filter: blur(8px); }
+        #game-over, #shop-menu { display: none; background: rgba(0,0,0,0.9); }
+        .menu-box { background: #222; padding: 30px; border-radius: 20px; border: 2px solid #444; width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
         
-        /* Shop Specific UI */
-        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; max-height: 300px; overflow-y: auto; padding: 5px; }
-        .shop-item { background: #333; padding: 10px; border-radius: 10px; border: 2px solid #555; cursor: pointer; }
-        .shop-item.owned { border-color: #00e676; }
-        .shop-item.selected { background: #444; border-color: #2196f3; box-shadow: 0 0 10px #2196f3; }
-        .coin-count { color: #ffd700; font-weight: bold; font-size: 20px; margin-bottom: 10px; }
+        /* Top Right Shop Tab */
+        #openShopBtn { position: absolute; top: 20px; right: 20px; width: 100px; padding: 10px; background: #ffd700; color: #000; border-radius: 12px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
 
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; max-height: 400px; overflow-y: auto; padding: 10px; }
+        .shop-item { background: #333; padding: 15px; border-radius: 15px; border: 2px solid #555; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; align-items: center; }
+        .shop-item.owned { border-color: #00e676; }
+        .shop-item.selected { background: #444; border-color: #2196f3; transform: scale(1.05); }
+        .preview-canvas { background: rgba(0,0,0,0.2); border-radius: 8px; margin: 8px 0; }
+        
+        .coin-count { color: #ffd700; font-weight: bold; font-size: 20px; margin-bottom: 10px; }
         button { width: 90%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; font-size: 16px; background: #00e676; font-weight: bold; cursor: pointer; color: #000; transition: transform 0.1s; }
-        button:active { transform: scale(0.95); }
         
         #ui { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; pointer-events: none; z-index: 1000; display: none; }
         #right-ui { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; display: none; }
@@ -53,6 +43,7 @@
 <body>
 
     <div id="menu">
+        <button id="openShopBtn">SHOP</button>
         <div class="menu-box">
             <h1 style="color:#00e676; margin-top: 0; letter-spacing: 2px;">SWORD BATTLE</h1>
             <div class="coin-count" id="menu-coins">Coins: 0</div>
@@ -63,16 +54,14 @@
                 <option value="ocean">Deep Ocean</option>
             </select>
             <button id="startBtn">START GAME</button>
-            <button id="openShopBtn" style="background: #ffd700;">SKINS SHOP</button>
         </div>
     </div>
 
     <div id="shop-menu">
-        <div class="menu-box" style="width: 340px;">
+        <div class="menu-box" style="width: 380px;">
             <h2 style="margin:0; color:#ffd700;">SKINS SHOP</h2>
             <div id="shop-coin-display" class="coin-count">Coins: 0</div>
-            <div class="shop-grid" id="shop-grid">
-                </div>
+            <div class="shop-grid" id="shop-grid"></div>
             <button id="closeShopBtn" style="background:#555; color:white;">BACK</button>
         </div>
     </div>
@@ -112,7 +101,6 @@
         const miniCanvas = document.getElementById('minimap');
         const miniCtx = miniCanvas.getContext('2d');
         
-        // UI Elements
         const menu = document.getElementById('menu'), gameOverScreen = document.getElementById('game-over'), shopMenu = document.getElementById('shop-menu');
         const uiLayer = document.getElementById('ui'), rightUI = document.getElementById('right-ui'), lbList = document.getElementById('lb-list');
         const joyBase = document.getElementById('joystick-base'), joyStick = document.getElementById('joystick-stick');
@@ -124,7 +112,7 @@
         const camera = { x: WORLD_SIZE/2, y: WORLD_SIZE/2, zoom: 0.8 };
         const bushes = [], bots = [], xpGems = [], damageTexts = [];
 
-        // --- SHOP & PERSISTENCE LOGIC ---
+        // --- SHOP & PERSISTENCE ---
         let totalCoins = parseInt(localStorage.getItem('sb_coins')) || 0;
         let ownedSkins = JSON.parse(localStorage.getItem('sb_owned')) || ['Default'];
         let selectedSkinName = localStorage.getItem('sb_selected') || 'Default';
@@ -150,21 +138,30 @@
                 
                 const item = document.createElement('div');
                 item.className = `shop-item ${isOwned ? 'owned' : ''} ${isSelected ? 'selected' : ''}`;
-                item.innerHTML = `
-                    <div style="font-weight:bold; color:${s.color}">${name}</div>
-                    <div style="font-size:12px">${isOwned ? (isSelected ? 'EQUIPPED' : 'OWNED') : s.price + ' Coins'}</div>
-                `;
+                
+                // Create Preview Canvas
+                const pcvs = document.createElement('canvas');
+                pcvs.width = 80; pcvs.height = 80; pcvs.className = 'preview-canvas';
+                const pctx = pcvs.getContext('2d');
+                
+                // Draw Preview
+                pctx.translate(40, 40);
+                // Body
+                pctx.beginPath(); pctx.arc(0, 0, 15, 0, Math.PI*2); pctx.fillStyle = s.color; pctx.fill();
+                // Sword
+                pctx.rotate(-0.5);
+                pctx.fillStyle = s.hilt; pctx.fillRect(10, -2, 8, 4);
+                pctx.fillStyle = s.sword; pctx.fillRect(18, -4, 25, 8);
+
+                item.innerHTML = `<div style="font-weight:bold; font-size:14px;">${name}</div>`;
+                item.appendChild(pcvs);
+                item.innerHTML += `<div style="font-size:12px">${isOwned ? (isSelected ? 'EQUIPPED' : 'OWNED') : s.price + ' Coins'}</div>`;
+                
                 item.onclick = () => {
-                    if (isOwned) {
-                        selectedSkinName = name;
-                        localStorage.setItem('sb_selected', name);
-                    } else if (totalCoins >= s.price) {
-                        totalCoins -= s.price;
-                        ownedSkins.push(name);
-                        selectedSkinName = name;
-                        localStorage.setItem('sb_coins', totalCoins);
-                        localStorage.setItem('sb_owned', JSON.stringify(ownedSkins));
-                        localStorage.setItem('sb_selected', name);
+                    if (isOwned) { selectedSkinName = name; localStorage.setItem('sb_selected', name); }
+                    else if (totalCoins >= s.price) {
+                        totalCoins -= s.price; ownedSkins.push(name); selectedSkinName = name;
+                        localStorage.setItem('sb_coins', totalCoins); localStorage.setItem('sb_owned', JSON.stringify(ownedSkins)); localStorage.setItem('sb_selected', name);
                     }
                     updateShopUI();
                 };
@@ -179,8 +176,8 @@
         // --- GAME LOGIC ---
         const themes = {
             grass: { bg: '#2e7d32', sec: '#27632a', gem: '#ffd700', bush: 'rgba(34, 139, 34, 0.7)' },
-            lava: { bg: '#bf360c', sec: '#3e1105', gem: '#ffab00', bush: 'rgba(74, 34, 20, 0.7)' },
-            ocean: { bg: '#01579b', sec: '#013a6b', gem: '#00e5ff', bush: 'rgba(0, 70, 90, 0.6)' }
+            lava: { bg: '#420d09', sec: '#ff4500', gem: '#ffab00', bush: 'rgba(20, 10, 5, 0.8)' },
+            ocean: { bg: '#002147', sec: '#0077be', gem: '#00e5ff', bush: 'rgba(0, 40, 60, 0.6)' }
         };
         let currentTheme = themes.grass;
 
@@ -190,6 +187,18 @@
             swingProgress: 0, hitList: new Set(), dashTimer: 0, dashCooldown: 0,
             kx: 0, ky: 0, xp: 0, totalXp: 0, nextLevel: 100, tier: 1, scale: 1, isPlayer: true, kills: 0, hidden: false, trail: []
         };
+
+        function spawnBot() {
+            const tier = Math.floor(Math.random() * 2) + 1;
+            bots.push({
+                id: Math.random().toString(36).substr(2, 9), x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE,
+                radius: 30 * (1+(tier-1)*0.3), hp: 100*tier, maxHp: 100*tier, color: '#f44336', name: "Bot",
+                speed: 4.5, angle: Math.random()*Math.PI*2, isAttacking: false, swingProgress: 0, hitList: new Set(), 
+                kx: 0, ky: 0, tier: tier, scale: 1+(tier-1)*0.3, isPlayer: false, totalXp: (tier-1)*100, xp: 0, nextLevel: 100, 
+                dashTimer: 0, hidden: false, wanderAngle: Math.random()*Math.PI*2, wanderTime: 0, trail: [],
+                swordColor: '#fff', hiltColor: '#222'
+            });
+        }
 
         function preInitWorld() {
             bushes.length = 0; bots.length = 0; xpGems.length = 0;
@@ -208,13 +217,8 @@
             player.name = document.getElementById('username').value || "Player";
             document.getElementById('ui-name').innerText = player.name;
             currentTheme = themes[document.getElementById('worldSelect').value];
-            
-            // Apply Skin
             const skin = skins[selectedSkinName];
-            player.color = skin.color;
-            player.swordColor = skin.sword;
-            player.hiltColor = skin.hilt;
-
+            player.color = skin.color; player.swordColor = skin.sword; player.hiltColor = skin.hilt;
             resetPlayer();
             menu.style.display = 'none'; uiLayer.style.display = 'block'; rightUI.style.display = 'flex';
             document.querySelectorAll('.touch-ctrl').forEach(el => el.style.display = 'flex');
@@ -228,131 +232,55 @@
             player.totalXp = 0; player.kills = 0; kills = 0; player.trail = [];
         }
 
-        document.getElementById('respawnBtn').onclick = () => { 
-            gameOverScreen.style.display = 'none'; 
-            resetPlayer(); 
-            gameActive = true; 
-        };
+        document.getElementById('respawnBtn').onclick = () => { gameOverScreen.style.display = 'none'; resetPlayer(); gameActive = true; };
         document.getElementById('menuBtn').onclick = () => { location.reload(); };
-
-        function spawnBot() {
-            const tier = Math.floor(Math.random() * 2) + 1;
-            bots.push({
-                id: Math.random().toString(36).substr(2, 9), x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE,
-                radius: 30 * (1+(tier-1)*0.3), hp: 100*tier, maxHp: 100*tier, color: '#f44336', name: "Bot",
-                speed: 4.5, angle: Math.random()*Math.PI*2, isAttacking: false, swingProgress: 0, hitList: new Set(), 
-                kx: 0, ky: 0, tier: tier, scale: 1+(tier-1)*0.3, isPlayer: false, totalXp: (tier-1)*100, xp: 0, nextLevel: 100, 
-                dashTimer: 0, hidden: false, wanderAngle: Math.random()*Math.PI*2, wanderTime: 0, trail: [],
-                swordColor: '#fff', hiltColor: '#222'
-            });
-        }
 
         function spawnGem(x, y, value) { xpGems.push({ x: x || Math.random()*WORLD_SIZE, y: y || Math.random()*WORLD_SIZE, val: value || 15, size: 5 + Math.random()*5 }); }
         function addDamageText(x, y, text, color) { damageTexts.push({ x, y, text, color, life: 1.0, vx: (Math.random()-0.5)*2, vy: -2 }); }
 
-        // Input handling
-        joyBase.addEventListener('touchstart', (e) => { 
-            const touch = e.changedTouches[0];
-            joyState.active = true; joyState.id = touch.identifier; 
-            updateJoy(touch);
-            e.preventDefault(); 
-        }, {passive: false});
+        // Input
+        joyBase.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyState.active = true; joyState.id = t.identifier; updateJoy(t); e.preventDefault(); }, {passive: false});
+        window.addEventListener('touchmove', (e) => { if (!joyState.active) return; for(let i=0; i<e.changedTouches.length; i++){ if(e.changedTouches[i].identifier === joyState.id){ updateJoy(e.changedTouches[i]); e.preventDefault(); }}}, {passive: false});
+        function updateJoy(t){ const r = joyBase.getBoundingClientRect(); const dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2); const dist = Math.min(60, Math.hypot(dx, dy)), a = Math.atan2(dy, dx); joyState.x = (Math.cos(a) * dist) / 60; joyState.y = (Math.sin(a) * dist) / 60; joyStick.style.transform = `translate(${joyState.x * 50}px, ${joyState.y * 50}px)`; }
+        window.addEventListener('touchend', (e) => { for(let i=0; i<e.changedTouches.length; i++){ if(e.changedTouches[i].identifier === joyState.id){ joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; }}});
+        document.getElementById('atk-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(!player.isAttacking && gameActive) { player.isAttacking = true; player.swingProgress = 0; player.hitList.clear(); }}, {passive: false});
+        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(player.dashCooldown <= 0 && gameActive) { player.dashTimer = 18; player.dashCooldown = 65; }}, {passive: false});
 
-        window.addEventListener('touchmove', (e) => {
-            if (!joyState.active) return;
-            for(let i=0; i<e.changedTouches.length; i++){
-                if(e.changedTouches[i].identifier === joyState.id){
-                    updateJoy(e.changedTouches[i]);
-                    e.preventDefault();
-                }
-            }
-        }, {passive: false});
-
-        function updateJoy(touch){
-            const rect = joyBase.getBoundingClientRect();
-            const dx = touch.clientX - (rect.left + rect.width/2), dy = touch.clientY - (rect.top + rect.height/2);
-            const dist = Math.min(60, Math.hypot(dx, dy)), angle = Math.atan2(dy, dx);
-            joyState.x = (Math.cos(angle) * dist) / 60; joyState.y = (Math.sin(angle) * dist) / 60;
-            joyStick.style.transform = `translate(${joyState.x * 50}px, ${joyState.y * 50}px)`;
-        }
-
-        window.addEventListener('touchend', (e) => { 
-            for(let i=0; i<e.changedTouches.length; i++){
-                if(e.changedTouches[i].identifier === joyState.id){
-                    joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; 
-                }
-            }
-        });
-
-        document.getElementById('atk-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(!player.isAttacking && gameActive) { player.isAttacking = true; player.swingProgress = 0; player.hitList.clear(); } }, {passive: false});
-        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(player.dashCooldown <= 0 && gameActive) { player.dashTimer = 18; player.dashCooldown = 65; } }, {passive: false});
-
-        function resolveCollision(a, b) {
-            if (a.dashTimer > 0 || b.dashTimer > 0) return;
-            const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy), minDist = a.radius + b.radius;
-            if (dist < minDist && dist > 0) {
-                const overlap = (minDist - dist) / 2;
-                a.x -= (dx/dist)*overlap; a.y -= (dy/dist)*overlap; b.x += (dx/dist)*overlap; b.y += (dy/dist)*overlap;
-            }
-        }
-
-        function checkStealth(ent) {
-            ent.hidden = false;
-            for(let b of bushes) {
-                for(let p of b.parts) {
-                    if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.8) {
-                        ent.hidden = true; return;
-                    }
-                }
-            }
-        }
+        function resolveCollision(a, b) { if (a.dashTimer > 0 || b.dashTimer > 0) return; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy), min = a.radius + b.radius; if (dist < min && dist > 0) { const overlap = (min - dist) / 2; a.x -= (dx/dist)*overlap; a.y -= (dy/dist)*overlap; b.x += (dx/dist)*overlap; b.y += (dy/dist)*overlap; }}
+        function checkStealth(ent) { ent.hidden = false; for(let b of bushes) { for(let p of b.parts) { if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.8) { ent.hidden = true; return; }}}}
 
         function drawBody(e, x, y) {
             if (e.isAttacking && e.trail.length > 1) {
-                ctx.beginPath();
-                ctx.moveTo(e.trail[0].x, e.trail[0].y);
+                ctx.beginPath(); ctx.moveTo(e.trail[0].x, e.trail[0].y);
                 for (let i = 1; i < e.trail.length; i++) ctx.lineTo(e.trail[i].x, e.trail[i].y);
                 ctx.strokeStyle = `rgba(255, 255, 255, ${e.hidden ? 0.1 : 0.4})`;
-                ctx.lineWidth = 15 * e.scale;
-                ctx.lineCap = 'round'; ctx.stroke();
+                ctx.lineWidth = 15 * e.scale; ctx.lineCap = 'round'; ctx.stroke();
             }
-
             ctx.save(); ctx.translate(x, y);
             if(e.hidden) ctx.globalAlpha = 0.35;
-
             if(!e.hidden || (e.isPlayer)) {
                 const barW = 60 * e.scale;
                 ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(-barW/2 - 2, -62 * e.scale, barW + 4, 12 * e.scale);
                 ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff1744';
                 ctx.fillRect(-barW/2, -60 * e.scale, barW * (e.hp/e.maxHp), 8 * e.scale);
             }
-            
-            ctx.rotate(e.angle);
-            ctx.save();
-            
-            const s = e.scale;
-            const pivotX = e.radius * 0.7; 
-            ctx.translate(pivotX, 0);
-
+            ctx.rotate(e.angle); ctx.save();
+            const s = e.scale; const pivotX = e.radius * 0.7; ctx.translate(pivotX, 0);
             let swingAngle = 0.5;
             if (e.isAttacking) {
-                swingAngle = 0.8 - (e.swingProgress * 3.5); 
-                e.swingProgress += (0.16 / e.scale); 
+                swingAngle = 0.8 - (e.swingProgress * 3.5); e.swingProgress += (0.16 / e.scale); 
                 const tipDist = 85 * s;
                 const worldTipX = x + Math.cos(e.angle) * pivotX + Math.cos(e.angle + swingAngle) * tipDist;
                 const worldTipY = y + Math.sin(e.angle) * pivotX + Math.sin(e.angle + swingAngle) * tipDist;
-                e.trail.push({x: worldTipX, y: worldTipY});
-                if(e.trail.length > 8) e.trail.shift();
+                e.trail.push({x: worldTipX, y: worldTipY}); if(e.trail.length > 8) e.trail.shift();
                 if(e.swingProgress >= 1) { e.isAttacking = false; e.swingProgress = 0; e.hitList.clear(); e.trail = []; }
             }
             ctx.rotate(swingAngle);
-            
             ctx.fillStyle = e.hiltColor || '#222'; ctx.fillRect(0, -4*s, 18*s, 8*s); 
             ctx.fillStyle = e.hiltColor || '#999'; ctx.fillRect(18*s, -12*s, 6*s, 24*s); 
             ctx.fillStyle = e.swordColor || '#fff'; ctx.beginPath(); 
             ctx.moveTo(24*s, -8*s); ctx.lineTo(85*s, -2*s); ctx.lineTo(85*s, 2*s); ctx.lineTo(24*s, 8*s); ctx.fill();
             ctx.restore();
-            
             ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fillStyle = e.color; ctx.fill();
             ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.restore();
@@ -360,12 +288,8 @@
 
         function update() {
             if (gameActive && player.hp <= 0) { 
-                gameActive = false; 
-                totalCoins += Math.floor(player.totalXp); 
-                localStorage.setItem('sb_coins', totalCoins);
-                updateShopUI();
-                document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; 
-                gameOverScreen.style.display = 'flex'; 
+                gameActive = false; totalCoins += Math.floor(player.totalXp); localStorage.setItem('sb_coins', totalCoins); updateShopUI();
+                document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; gameOverScreen.style.display = 'flex'; 
             }
             if (gameActive) {
                 camera.zoom += ((1/(1+(player.tier-1)*0.04)) - camera.zoom)*0.1;
@@ -397,17 +321,26 @@
             bots.forEach((bot, idx) => {
                 checkStealth(bot);
                 let target = null, dMin = 600;
+                let coinTarget = null, cMin = 500;
+                
+                // Bot Prioritize Gems (Coins)
+                for(let g of xpGems) { let d=Math.hypot(g.x-bot.x, g.y-bot.y); if(d<cMin){ cMin=d; coinTarget=g; }}
+
                 entities.forEach(e => { if(e!==bot && !e.hidden){ let d=Math.hypot(e.x-bot.x, e.y-bot.y); if(d<dMin){ dMin=d; target=e; }} });
 
-                if (target) {
+                if (target && dMin < 250*bot.scale) {
                     bot.angle = Math.atan2(target.y-bot.y, target.x-bot.x);
                     bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
-                    if (dMin < 150*bot.scale && !bot.isAttacking && Math.random()<0.05) { bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); }
+                    if (dMin < 150*bot.scale && !bot.isAttacking) { bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); }
+                } else if (coinTarget) {
+                    bot.angle = Math.atan2(coinTarget.y-bot.y, coinTarget.x-bot.x);
+                    bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
                 } else {
                     if(bot.wanderTime <= 0) { bot.wanderAngle = Math.random() * Math.PI * 2; bot.wanderTime = 60 + Math.random() * 120; }
                     bot.x += Math.cos(bot.wanderAngle) * (bot.speed * 0.6); bot.y += Math.sin(bot.wanderAngle) * (bot.speed * 0.6);
                     bot.angle = bot.wanderAngle; bot.wanderTime--;
                 }
+
                 bot.x += bot.kx; bot.y += bot.ky; bot.kx *= 0.85; bot.ky *= 0.85;
                 bot.x = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.x));
                 bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.y));
@@ -420,8 +353,10 @@
                         if (bot.hp <= 0) { atk.kills++; atk.xp += 100*bot.tier; if(atk.isPlayer) kills++; }
                     }
                 });
+                
+                // Bot damage balanced to match player
                 if (gameActive && bot.isAttacking && !bot.hitList.has('player') && Math.hypot(bot.x-player.x, bot.y-player.y) < 130*bot.scale) {
-                    let dmg = Math.floor(10*bot.scale); player.hp -= dmg; bot.hitList.add('player');
+                    let dmg = Math.floor(20*bot.scale); player.hp -= dmg; bot.hitList.add('player');
                     addDamageText(player.x, player.y, dmg, "#ff1744");
                     player.kx = Math.cos(Math.atan2(player.y-bot.y, player.x-bot.x))*12; player.ky = Math.sin(Math.atan2(player.y-bot.y, player.x-bot.x))*12;
                 }
@@ -439,20 +374,33 @@
             update();
             ctx.save(); ctx.translate(w/2, h/2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
             
+            // Advanced Biome Backgrounds
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE, WORLD_SIZE);
-            ctx.fillStyle = currentTheme.sec;
-            for(let x=0; x<WORLD_SIZE; x+=100) for(let y=0; y<WORLD_SIZE; y+=100) if((x+y)%300 === 0) ctx.fillRect(x, y, 40, 40);
+            
+            const time = Date.now() * 0.002;
+            ctx.save();
+            if(document.getElementById('worldSelect').value === 'lava') {
+                for(let x=0; x<WORLD_SIZE; x+=300) for(let y=0; y<WORLD_SIZE; y+=300) {
+                    ctx.fillStyle = `rgba(255, 69, 0, ${0.1 + Math.sin(time + (x+y)*0.01)*0.05})`;
+                    ctx.fillRect(x, y, 200, 200);
+                }
+            } else if(document.getElementById('worldSelect').value === 'ocean') {
+                for(let x=0; x<WORLD_SIZE; x+=400) for(let y=0; y<WORLD_SIZE; y+=400) {
+                    ctx.fillStyle = `rgba(0, 119, 190, ${0.2 + Math.cos(time*0.5 + x*0.01)*0.1})`;
+                    ctx.beginPath(); ctx.arc(x, y, 150 + Math.sin(time)*20, 0, Math.PI*2); ctx.fill();
+                }
+            } else {
+                ctx.fillStyle = currentTheme.sec;
+                for(let x=0; x<WORLD_SIZE; x+=100) for(let y=0; y<WORLD_SIZE; y+=100) if((x+y)%300 === 0) ctx.fillRect(x, y, 40, 40);
+            }
+            ctx.restore();
 
             ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.lineWidth = 2;
             for(let x=0; x<=WORLD_SIZE; x+=200) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke(); }
             for(let y=0; y<=WORLD_SIZE; y+=200) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke(); }
             
-            // Gems drawn as Coins
             ctx.fillStyle = currentTheme.gem; 
-            xpGems.forEach(g => { 
-                ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill();
-                ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
-            });
+            xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke(); });
             
             bots.forEach(b => drawBody(b, b.x, b.y));
             if (gameActive && player.hp > 0) {
