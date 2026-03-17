@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SwordsBattle.io | Evolution</title>
+    <title>SwordsBattle.io | Evolution Fixed</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -90,7 +90,6 @@
         let kills = 0;
         const joyState = { x: 0, y: 0, active: false, id: null };
 
-        // WORLD CONFIG
         const WORLD_SIZE = 6000; 
         const camera = { x: 0, y: 0 };
         const bushes = [];
@@ -105,11 +104,12 @@
         let currentTheme = themes.grass;
 
         const player = {
+            id: 'player',
             x: WORLD_SIZE/2, y: WORLD_SIZE/2,
             radius: 30, hp: 100, maxHp: 100,
             color: '#2196f3', name: "Player",
             speed: 8, angle: 0,
-            isAttacking: false, swingAngle: 0,
+            isAttacking: false, swingAngle: 0, hitList: new Set(),
             dashTimer: 0, dashCooldown: 0,
             kx: 0, ky: 0,
             xp: 0, nextLevel: 100, tier: 1, scale: 1,
@@ -135,26 +135,21 @@
         function spawnBot() {
             const tier = Math.floor(Math.random() * 3) + 1;
             bots.push({
+                id: Math.random().toString(36).substr(2, 9),
                 x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE,
                 radius: 30 * (1 + (tier-1)*0.3), hp: 100 * tier, maxHp: 100 * tier, color: '#f44336',
                 name: "Bot", speed: 4 + Math.random()*2, angle: Math.random()*Math.PI*2,
-                isAttacking: false, swingAngle: 0, kx: 0, ky: 0, tier: tier, scale: 1 + (tier-1)*0.3, isPlayer: false
+                isAttacking: false, swingAngle: 0, hitList: new Set(), kx: 0, ky: 0, tier: tier, scale: 1 + (tier-1)*0.3, isPlayer: false
             });
         }
 
         function spawnGem(x, y, value) {
-            xpGems.push({
-                x: x || Math.random()*WORLD_SIZE,
-                y: y || Math.random()*WORLD_SIZE,
-                val: value || 10 + Math.random()*20,
-                size: 5 + Math.random()*5
-            });
+            xpGems.push({ x: x || Math.random()*WORLD_SIZE, y: y || Math.random()*WORLD_SIZE, val: value || 10 + Math.random()*20, size: 5 + Math.random()*5 });
         }
 
         // --- CONTROLS ---
         joyBase.addEventListener('touchstart', (e) => { 
-            joyState.active = true; joyState.id = e.targetTouches[0].identifier; 
-            e.preventDefault(); 
+            joyState.active = true; joyState.id = e.targetTouches[0].identifier; e.preventDefault(); 
         }, {passive: false});
 
         window.addEventListener('touchmove', (e) => {
@@ -179,7 +174,7 @@
 
         document.getElementById('atk-btn').addEventListener('touchstart', (e) => { 
             e.preventDefault(); e.stopPropagation();
-            if(!player.isAttacking) { player.isAttacking = true; player.swingAngle = -1.2; } 
+            if(!player.isAttacking) { player.isAttacking = true; player.swingAngle = -1.2; player.hitList.clear(); } 
         }, {passive: false});
 
         document.getElementById('dash-btn').addEventListener('touchstart', (e) => { 
@@ -198,18 +193,6 @@
             }
         }
 
-        function checkEvolution() {
-            if (player.xp >= player.nextLevel) {
-                player.tier++;
-                player.xp -= player.nextLevel;
-                player.nextLevel = Math.floor(player.nextLevel * 1.5);
-                player.scale += 0.2;
-                player.radius = 30 * player.scale;
-                player.maxHp += 50;
-                player.hp = player.maxHp;
-            }
-        }
-
         function keepInBounds(e) {
             e.x = Math.max(e.radius, Math.min(WORLD_SIZE - e.radius, e.x));
             e.y = Math.max(e.radius, Math.min(WORLD_SIZE - e.radius, e.y));
@@ -224,13 +207,15 @@
             ctx.fillRect(-30 * e.scale, -50 * e.scale, (60 * e.scale) * (e.hp/e.maxHp), 8);
             
             ctx.rotate(e.angle);
+            
+            // Sword Logic: Offset to the right side of character
             ctx.save();
+            ctx.translate(e.radius * 0.8, e.radius * 0.5); // Position on the right "hand" area
             if (e.isAttacking) { 
-                ctx.rotate(e.swingAngle); e.swingAngle += (0.3 / e.scale); 
-                if(e.swingAngle > 1.2) e.isAttacking = false; 
+                ctx.rotate(e.swingAngle); e.swingAngle += (0.25 / e.scale); 
+                if(e.swingAngle > 1.2) { e.isAttacking = false; e.hitList.clear(); }
             }
-            // Sword scaling
-            ctx.fillStyle = '#eee'; ctx.fillRect(30 * e.scale, -5, 45 * e.scale, 10);
+            ctx.fillStyle = '#eee'; ctx.fillRect(0, -5, 45 * e.scale, 10);
             ctx.restore();
             
             ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
@@ -256,7 +241,7 @@
             player.kx *= 0.85; player.ky *= 0.85;
             keepInBounds(player);
 
-            // XP Gems Collection
+            // XP Gems
             for (let i = xpGems.length - 1; i >= 0; i--) {
                 const gem = xpGems[i];
                 if (Math.hypot(player.x - gem.x, player.y - gem.y) < player.radius + 10) {
@@ -265,9 +250,11 @@
                     if (xpGems.length < 80) spawnGem();
                 }
             }
-            checkEvolution();
+            if (player.xp >= player.nextLevel) {
+                player.tier++; player.xp -= player.nextLevel; player.nextLevel = Math.floor(player.nextLevel * 1.5);
+                player.scale += 0.2; player.radius = 30 * player.scale; player.maxHp += 50; player.hp = player.maxHp;
+            }
 
-            // Bots
             const allEntities = [player, ...bots];
             bots.forEach((bot, index) => {
                 let nearest = null; let minDist = 800;
@@ -282,7 +269,7 @@
                     bot.x += Math.cos(bot.angle) * bot.speed;
                     bot.y += Math.sin(bot.angle) * bot.speed;
                     if (minDist < 100 * bot.scale && !bot.isAttacking && Math.random() < 0.04) {
-                        bot.isAttacking = true; bot.swingAngle = -1.2;
+                        bot.isAttacking = true; bot.swingAngle = -1.2; bot.hitList.clear();
                     }
                 }
 
@@ -290,28 +277,30 @@
                 bot.kx *= 0.85; bot.ky *= 0.85;
                 keepInBounds(bot);
 
-                // Hits
+                // FIXED: Hit Logic (Single hit per swing)
                 allEntities.forEach(attacker => {
-                    if (attacker === bot || !attacker.isAttacking) return;
-                    const range = 100 * attacker.scale;
+                    if (attacker === bot || !attacker.isAttacking || attacker.hitList.has(bot.id)) return;
+                    const range = 110 * attacker.scale;
                     const d = Math.hypot(attacker.x - bot.x, attacker.y - bot.y);
                     if (d < range) { 
-                        bot.hp -= (2 * attacker.scale); 
+                        bot.hp -= (20 * attacker.scale); 
+                        attacker.hitList.add(bot.id); // Mark as hit for this swing
                         const ang = Math.atan2(bot.y - attacker.y, bot.x - attacker.x);
                         bot.kx = Math.cos(ang) * 15; bot.ky = Math.sin(ang) * 15;
                     }
                 });
 
-                if (bot.isAttacking && Math.hypot(bot.x - player.x, bot.y - player.y) < 100 * bot.scale) {
-                    player.hp -= 0.4;
+                // Bot hitting player (Single hit per swing)
+                if (bot.isAttacking && !bot.hitList.has('player') && Math.hypot(bot.x - player.x, bot.y - player.y) < 100 * bot.scale) {
+                    player.hp -= 10;
+                    bot.hitList.add('player');
                     const ang = Math.atan2(player.y - bot.y, player.x - bot.x);
                     player.kx = Math.cos(ang) * 10; player.ky = Math.sin(ang) * 10;
                 }
 
                 allEntities.forEach(other => { if(bot !== other) resolveCollision(bot, other); });
-
                 if (bot.hp <= 0) { 
-                    for(let i=0; i<5; i++) spawnGem(bot.x, bot.y, 20); // Drops XP
+                    for(let i=0; i<5; i++) spawnGem(bot.x, bot.y, 20);
                     bots.splice(index, 1); spawnBot(); kills++; 
                 }
             });
@@ -329,14 +318,12 @@
             ctx.translate(-camera.x, -camera.y);
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
             
-            // Grid
             ctx.strokeStyle = 'rgba(255,255,255,0.05)';
             for(let x=0; x<WORLD_SIZE; x+=200) {
                 ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0,x); ctx.lineTo(WORLD_SIZE, x); ctx.stroke();
             }
 
-            // XP Gems
             ctx.fillStyle = currentTheme.gem;
             xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill(); });
             
@@ -346,11 +333,9 @@
             ctx.fillStyle = currentTheme.bush;
             bushes.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.size/2, 0, Math.PI*2); ctx.fill(); });
             
-            // World Border Visual
             ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 10; ctx.strokeRect(0,0, WORLD_SIZE, WORLD_SIZE);
             ctx.restore();
 
-            // Minimap
             miniCtx.fillStyle = '#000'; miniCtx.fillRect(0,0,160,160);
             const s = 160 / WORLD_SIZE;
             miniCtx.fillStyle = 'red'; bots.forEach(b => miniCtx.fillRect(b.x*s, b.y*s, 2, 2));
