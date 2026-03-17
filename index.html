@@ -115,8 +115,10 @@
             gameActive = true;
         };
 
+        // --- UPDATED MULTI-TOUCH LOGIC ---
         joyBase.addEventListener('touchstart', (e) => {
-            isTouch = true; joyState.active = true;
+            isTouch = true; 
+            joyState.active = true;
             joyState.id = e.targetTouches[0].identifier;
             e.preventDefault();
         }, {passive: false});
@@ -138,13 +140,29 @@
             e.preventDefault();
         }, {passive: false});
 
-        window.addEventListener('touchend', () => { 
-            joyState.active = false; joyState.x = 0; joyState.y = 0; 
-            joyStick.style.transform = 'none'; 
+        window.addEventListener('touchend', (e) => { 
+            // Only reset if the finger that was on the joystick is lifted
+            let touch = Array.from(e.changedTouches).find(t => t.identifier === joyState.id);
+            if(touch) {
+                joyState.active = false; 
+                joyState.x = 0; 
+                joyState.y = 0; 
+                joyStick.style.transform = 'none'; 
+                joyState.id = null;
+            }
         });
 
-        document.getElementById('atk-btn').ontouchstart = (e) => { e.preventDefault(); if(!player.isAttacking) { player.isAttacking = true; player.swingAngle = -1.2; } };
-        document.getElementById('dash-btn').ontouchstart = (e) => { e.preventDefault(); if(player.dashCooldown <= 0) { player.dashTimer = 15; player.dashCooldown = 60; } };
+        document.getElementById('atk-btn').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation();
+            if(!player.isAttacking) { player.isAttacking = true; player.swingAngle = -1.2; } 
+        }, {passive: false});
+
+        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation();
+            if(player.dashCooldown <= 0) { player.dashTimer = 15; player.dashCooldown = 60; } 
+        }, {passive: false});
 
         function drawEntity(e) {
             ctx.save();
@@ -169,20 +187,17 @@
         function update() {
             if(!gameActive) return;
 
-            // Calculate movement speed and dash bonus
             let currentSpeed = player.speed;
             let dashBonus = player.dashTimer > 0 ? 12 : 0; 
 
             if (player.dashTimer > 0) player.dashTimer--;
             if (player.dashCooldown > 0) player.dashCooldown--;
 
-            // Move player if joystick is active, even while attacking or dashing
             if (joyState.active) {
                 player.x += joyState.x * (currentSpeed + dashBonus);
                 player.y += joyState.y * (currentSpeed + dashBonus);
                 player.angle = Math.atan2(joyState.y, joyState.x);
             } else if (player.dashTimer > 0) {
-                // Keep moving in current facing direction if dashing without joystick input
                 player.x += Math.cos(player.angle) * dashBonus;
                 player.y += Math.sin(player.angle) * dashBonus;
             }
