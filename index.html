@@ -57,7 +57,7 @@
 
         #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.6); padding: 15px 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px); display: none; z-index: 1000; }
         #right-ui { position: absolute; top: 20px; right: 20px; display: none; flex-direction: column; gap: 15px; z-index: 1000; }
-        #minimap-container { width: 150px; height: 150px; background: rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; overflow: hidden; position: relative; }
+        #minimap-container { width: 150px; height: 150px; background: rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.4); border-radius: 12px; overflow: hidden; }
         #leaderboard { width: 150px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; color: white; font-size: 12px; }
         
         .touch-ctrl { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); display: none; z-index: 1500; align-items: center; justify-content: center; }
@@ -103,7 +103,7 @@
     </div>
 
     <div id="ui">
-        <div id="ui-name" style="font-weight:900; color:var(--primary); font-size: 18px;">Player</div>
+        <div id="ui-name-static" style="font-weight:900; color:var(--primary); font-size: 18px;">Player</div>
         <div id="xp-display" style="font-size:12px; opacity:0.8; margin-bottom: 5px;">Tier 1: 0 / 100</div>
         <div style="display: flex; gap: 15px;">
             <div id="score" style="font-size:14px; font-weight:bold; color:#fff;">Kills: 0</div>
@@ -133,7 +133,7 @@
         const joyBase = document.getElementById('joystick-base'), joyStick = document.getElementById('joystick-stick');
 
         let w = canvas.width = window.innerWidth, h = canvas.height = window.innerHeight;
-        let gameActive = false, menuActive = true, kills = 0;
+        let gameActive = false, menuActive = true, kills = 0, sessionCoins = 0;
         const joyState = { x: 0, y: 0, active: false, id: null };
         const WORLD_SIZE = 6000; 
         const camera = { x: WORLD_SIZE/2, y: WORLD_SIZE/2, zoom: 0.8 };
@@ -210,8 +210,8 @@
         }
 
         document.getElementById('startBtn').onclick = () => {
-            player.name = document.getElementById('username').value || "Knight";
-            document.getElementById('ui-name').innerText = player.name;
+            player.name = document.getElementById('username').value.trim() || "Player";
+            document.getElementById('ui-name-static').innerText = player.name;
             currentTheme = themes[document.getElementById('worldSelect').value];
             const skin = skins[selectedSkinName];
             player.color = skin.color; player.swordColor = skin.sword; player.hiltColor = skin.hilt;
@@ -225,13 +225,22 @@
             player.x = WORLD_SIZE/2 + (Math.random()-0.5)*1000;
             player.y = WORLD_SIZE/2 + (Math.random()-0.5)*1000;
             player.hp = 150; player.maxHp = 150; player.xp = 0; player.tier = 1;
-            player.scale = 1; player.radius = 30; player.nextLevel = 100; player.totalXp = 0; player.kills = 0; kills = 0; player.trail = [];
+            player.scale = 1; player.radius = 30; player.nextLevel = 100; player.totalXp = 0; player.kills = 0; kills = 0; player.trail = []; sessionCoins = 0;
         }
 
         document.getElementById('respawnBtn').onclick = () => { gameOverScreen.style.display = 'none'; resetPlayer(); gameActive = true; };
         document.getElementById('menuBtn').onclick = () => { location.reload(); };
 
-        function spawnGem(x, y, value) { xpGems.push({ x: x || Math.random()*WORLD_SIZE, y: y || Math.random()*WORLD_SIZE, val: value || 15, size: 5 + Math.random()*5 }); }
+        function spawnGem(x, y, value) { 
+            const val = value || (Math.random() < 0.1 ? 50 : 15);
+            xpGems.push({ 
+                x: x || Math.random()*WORLD_SIZE, 
+                y: y || Math.random()*WORLD_SIZE, 
+                val: val, 
+                size: val === 50 ? 12 : 6,
+                isCoin: val === 50
+            }); 
+        }
         function addDamageText(x, y, text, color) { damageTexts.push({ x, y, text, color, life: 1.0, vx: (Math.random()-0.5)*2, vy: -2 }); }
 
         joyBase.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyState.active = true; joyState.id = t.identifier; updateJoy(t); e.preventDefault(); }, {passive: false});
@@ -253,6 +262,11 @@
             }
             ctx.save(); ctx.translate(x, y);
             if(e.hidden) ctx.globalAlpha = 0.3;
+
+            // Name Overhead
+            ctx.fillStyle = "white"; ctx.font = `bold ${14 * e.scale}px Arial`; ctx.textAlign = "center";
+            ctx.fillText(e.name, 0, -75 * e.scale);
+
             if(!e.hidden || (e.isPlayer)) {
                 const barW = 60 * e.scale;
                 ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(-barW/2, -62 * e.scale, barW, 8 * e.scale);
@@ -290,8 +304,7 @@
 
             if (gameActive && player.hp <= 0) { 
                 gameActive = false; 
-                let earned = Math.floor(player.totalXp/10);
-                totalCoins += earned; 
+                totalCoins += sessionCoins;
                 localStorage.setItem('sb_coins', totalCoins);
                 document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; 
                 gameOverScreen.style.display = 'flex'; 
@@ -316,7 +329,6 @@
                 checkStealth(player);
             }
 
-            // Damage and Knockback
             entities.forEach(atk => {
                 if (!atk.isAttacking) return;
                 entities.forEach(vic => {
@@ -328,7 +340,14 @@
                         const knockAngle = Math.atan2(vic.y - atk.y, vic.x - atk.x);
                         vic.kx = Math.cos(knockAngle) * 22; vic.ky = Math.sin(knockAngle) * 22;
                         addDamageText(vic.x, vic.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
-                        if (vic.hp <= 0) { atk.kills++; atk.xp += 100*vic.tier; if(atk.isPlayer) kills++; }
+                        if (vic.hp <= 0) { 
+                            atk.kills++; atk.xp += 100*vic.tier; 
+                            if(atk.isPlayer) {
+                                kills++;
+                                sessionCoins += 50 * vic.tier; // Direct coin reward for kill
+                                addDamageText(vic.x, vic.y, `+${50*vic.tier} Coins`, "#ffd700");
+                            }
+                        }
                     }
                 });
             });
@@ -358,14 +377,23 @@
                 bot.x = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.x));
                 bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.y));
                 entities.forEach(other => { if(bot !== other) resolveCollision(bot, other); });
-                if (bot.hp <= 0) { for(let i=0; i<6; i++) spawnGem(bot.x, bot.y, 35); bots.splice(idx, 1); spawnBot(); }
+                if (bot.hp <= 0) { 
+                    // Drops coins on ground on death
+                    for(let i=0; i<3; i++) spawnGem(bot.x + (Math.random()-0.5)*100, bot.y + (Math.random()-0.5)*100, 50); 
+                    bots.splice(idx, 1); spawnBot(); 
+                }
             });
 
             entities.forEach(ent => {
                 for (let i = xpGems.length-1; i >= 0; i--) {
-                    if (Math.hypot(ent.x - xpGems[i].x, ent.y - xpGems[i].y) < ent.radius+15) {
-                        ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val; xpGems.splice(i, 1);
-                        if (xpGems.length < 160) spawnGem();
+                    if (Math.hypot(ent.x - xpGems[i].x, ent.y - xpGems[i].y) < ent.radius+20) {
+                        if (xpGems[i].isCoin) {
+                            if(ent.isPlayer) sessionCoins += xpGems[i].val;
+                        } else {
+                            ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val;
+                        }
+                        xpGems.splice(i, 1);
+                        if (xpGems.length < 180) spawnGem();
                     }
                 }
                 if (ent.xp >= ent.nextLevel) {
@@ -385,7 +413,6 @@
             ctx.save(); ctx.translate(w/2, h/2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE, WORLD_SIZE);
             
-            // Background patterns
             const time = Date.now() * 0.002;
             if(currentTheme === themes.lava) {
                 for(let x=0; x<WORLD_SIZE; x+=300) for(let y=0; y<WORLD_SIZE; y+=300) {
@@ -401,8 +428,12 @@
                 for(let x=0; x<WORLD_SIZE; x+=200) for(let y=0; y<WORLD_SIZE; y+=200) if((x+y)%400 === 0) ctx.fillRect(x, y, 80, 80);
             }
             
-            ctx.fillStyle = currentTheme.gem; 
-            xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill(); });
+            xpGems.forEach(g => { 
+                ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); 
+                ctx.fillStyle = g.isCoin ? "#ffd700" : currentTheme.gem;
+                ctx.fill(); 
+                if(g.isCoin) { ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2; ctx.stroke(); }
+            });
             bots.forEach(b => drawBody(b, b.x, b.y));
             if (gameActive && player.hp > 0) {
                 if(player.dashTimer > 0) { ctx.globalAlpha = 0.3; drawBody(player, player.x-Math.cos(player.dashAngle)*40, player.y-Math.sin(player.dashAngle)*40); ctx.globalAlpha = 1; }
@@ -410,21 +441,21 @@
             }
             ctx.fillStyle = currentTheme.bush; 
             bushes.forEach(b => b.parts.forEach(p => { ctx.beginPath(); ctx.arc(b.x+p.ox, b.y+p.oy, p.r, 0, Math.PI*2); ctx.fill(); }));
-            damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = d.life; ctx.fillStyle = d.color; ctx.font = "bold 32px Arial"; ctx.textAlign = "center"; ctx.fillText(d.text, d.x, d.y); ctx.restore(); });
+            damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = d.life; ctx.fillStyle = d.color; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.fillText(d.text, d.x, d.y); ctx.restore(); });
             ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 20; ctx.strokeRect(0,0,WORLD_SIZE, WORLD_SIZE);
             ctx.restore();
             
             if (gameActive) {
-                // Clear Minimap and draw at perfect 150/6000 scale
-                miniCtx.clearRect(0,0,150,150);
+                miniCtx.fillStyle = 'rgba(0,0,0,0.85)';
+                miniCtx.fillRect(0,0,150,150);
                 const s = 150 / WORLD_SIZE;
+                miniCtx.strokeStyle = "rgba(255,255,255,0.1)"; miniCtx.strokeRect(0,0,150,150);
                 miniCtx.fillStyle = 'red'; bots.forEach(b => { if(!b.hidden) miniCtx.fillRect(b.x*s-1, b.y*s-1, 3, 3); });
                 miniCtx.fillStyle = '#00e676'; miniCtx.fillRect(player.x*s-2, player.y*s-2, 5, 5);
                 
-                // UI Updates
                 document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
-                document.getElementById('ingame-coins').innerText = "Coins: " + Math.floor(player.totalXp/10);
+                document.getElementById('ingame-coins').innerText = "Coins: " + sessionCoins;
             }
             requestAnimationFrame(draw);
         }
@@ -435,7 +466,7 @@
             bushes.push({ x: bx, y: by, parts: parts });
         }
         for(let i=0; i<35; i++) spawnBot();
-        for(let i=0; i<160; i++) spawnGem();
+        for(let i=0; i<180; i++) spawnGem();
         draw();
     </script>
 </body>
