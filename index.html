@@ -215,6 +215,10 @@
             });
         }
 
+        // --- NEW SHOP BUTTON LISTENERS ---
+        document.getElementById('openShopBtn').onclick = () => { updateShopUI(); shopMenu.style.display = 'flex'; menu.style.display = 'none'; };
+        document.getElementById('closeShopBtn').onclick = () => { shopMenu.style.display = 'none'; menu.style.display = 'flex'; };
+
         function renderSword(c, x, y, s, angle, bladeCol, hiltCol) {
             c.save(); c.translate(x, y); c.rotate(angle);
             const scale = s;
@@ -358,14 +362,19 @@
                 camera.zoom = 0.5;
             }
             if (gameActive && player.hp <= 0) { 
-                gameActive = false; totalCoins += sessionCoins; localStorage.setItem('sb_coins', totalCoins);
+                gameActive = false; 
+                // totalCoins is already updated in real-time, no need for session add here.
                 document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; gameOverScreen.style.display = 'flex'; 
             }
             const entities = gameActive ? [player, ...bots] : bots;
             if (gameActive) {
                 camera.zoom += ((1/(1+(player.tier-1)*0.04)) - camera.zoom)*0.1;
                 camera.x += (player.x - camera.x)*0.1; camera.y += (player.y - camera.y)*0.1;
-                let speed = (player.speed - (player.tier*0.05));
+                
+                // DECREASE SPEED MORE AT HIGHER TIERS
+                let speed = (player.speed - (player.tier * 0.12));
+                if (speed < 3) speed = 3; // Minimum speed cap
+
                 if (player.dashTimer > 0) {
                     player.x += Math.cos(player.dashAngle) * 18; player.y += Math.sin(player.dashAngle) * 18; player.dashTimer--;
                     if (player.dashTimer % 3 === 0) {
@@ -399,7 +408,14 @@
                         addDamageText(vic.x, vic.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
                         if (vic.hp <= 0) { 
                             atk.kills++; atk.xp += 100*vic.tier; 
-                            if(atk.isPlayer) { kills++; sessionCoins += 50 * vic.tier; addDamageText(vic.x, vic.y, `+${50*vic.tier} Coins`, "#ffd700"); }
+                            if(atk.isPlayer) { 
+                                kills++; 
+                                const gained = 50 * vic.tier;
+                                sessionCoins += gained; 
+                                totalCoins += gained; // SAVE IMMEDIATELY
+                                localStorage.setItem('sb_coins', totalCoins);
+                                addDamageText(vic.x, vic.y, `+${gained} Coins`, "#ffd700"); 
+                            }
                             else atk.coins += 50 * vic.tier;
                         }
                     }
@@ -435,14 +451,23 @@
             entities.forEach(ent => {
                 for (let i = xpGems.length-1; i >= 0; i--) {
                     if (Math.hypot(ent.x - xpGems[i].x, ent.y - xpGems[i].y) < ent.radius+20) {
-                        if (xpGems[i].isCoin) { if(ent.isPlayer) sessionCoins += xpGems[i].val; else ent.coins += xpGems[i].val; }
+                        if (xpGems[i].isCoin) { 
+                            if(ent.isPlayer) {
+                                sessionCoins += xpGems[i].val; 
+                                totalCoins += xpGems[i].val; // SAVE IMMEDIATELY
+                                localStorage.setItem('sb_coins', totalCoins);
+                            } else ent.coins += xpGems[i].val; 
+                        }
                         else { ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val; }
                         xpGems.splice(i, 1); if (xpGems.length < 180) spawnGem();
                     }
                 }
                 if (ent.xp >= ent.nextLevel) {
                     ent.tier++; ent.xp -= ent.nextLevel; ent.nextLevel = Math.floor(ent.nextLevel * 1.8);
-                    ent.scale += 0.22; ent.radius = 30 * ent.scale; ent.maxHp += 40; ent.hp = ent.maxHp;
+                    
+                    // INCREASE SIZE GAIN MORE PER TIER (0.22 -> 0.35)
+                    ent.scale += 0.35; 
+                    ent.radius = 30 * ent.scale; ent.maxHp += 40; ent.hp = ent.maxHp;
                 }
             });
             for (let i = damageTexts.length-1; i >= 0; i--) { damageTexts[i].y += damageTexts[i].vy; damageTexts[i].life -= 0.02; if(damageTexts[i].life <= 0) damageTexts.splice(i, 1); }
