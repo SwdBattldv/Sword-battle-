@@ -194,46 +194,18 @@
             if(!isPreview) c.translate(x, y);
             c.rotate(angle);
             const scale = s * (isPreview ? 0.8 : 1);
-            
-            // Pommel (Circular end)
             c.fillStyle = hiltCol;
-            c.beginPath();
-            c.arc(-5 * scale, 0, 6 * scale, 0, Math.PI * 2);
-            c.fill();
-            c.strokeStyle = '#000';
-            c.lineWidth = 1.5 * scale;
-            c.stroke();
-
-            // Handle (Grip)
-            c.fillStyle = '#5D4037';
-            c.fillRect(0, -4 * scale, 15 * scale, 8 * scale);
+            c.beginPath(); c.arc(-5 * scale, 0, 6 * scale, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = '#000'; c.lineWidth = 1.5 * scale; c.stroke();
+            c.fillStyle = '#5D4037'; c.fillRect(0, -4 * scale, 15 * scale, 8 * scale);
             c.strokeRect(0, -4 * scale, 15 * scale, 8 * scale);
-
-            // Crossguard (Gold part in image)
-            c.fillStyle = hiltCol;
-            c.fillRect(15 * scale, -15 * scale, 8 * scale, 30 * scale);
+            c.fillStyle = hiltCol; c.fillRect(15 * scale, -15 * scale, 8 * scale, 30 * scale);
             c.strokeRect(15 * scale, -15 * scale, 8 * scale, 30 * scale);
-
-            // Blade (Main silver body)
-            c.fillStyle = bladeCol;
-            c.beginPath();
-            c.moveTo(23 * scale, -11 * scale);
-            c.lineTo(85 * scale, -6 * scale);
-            c.lineTo(100 * scale, 0); // Point
-            c.lineTo(85 * scale, 6 * scale);
-            c.lineTo(23 * scale, 11 * scale);
-            c.closePath();
-            c.fill();
-            c.stroke();
-
-            // Fuller (Middle line / shading)
-            c.strokeStyle = 'rgba(0,0,0,0.15)';
-            c.lineWidth = 2 * scale;
-            c.beginPath();
-            c.moveTo(25 * scale, 0);
-            c.lineTo(80 * scale, 0);
-            c.stroke();
-            
+            c.fillStyle = bladeCol; c.beginPath();
+            c.moveTo(23 * scale, -11 * scale); c.lineTo(85 * scale, -6 * scale); c.lineTo(100 * scale, 0);
+            c.lineTo(85 * scale, 6 * scale); c.lineTo(23 * scale, 11 * scale); c.closePath(); c.fill(); c.stroke();
+            c.strokeStyle = 'rgba(0,0,0,0.15)'; c.lineWidth = 2 * scale;
+            c.beginPath(); c.moveTo(25 * scale, 0); c.lineTo(80 * scale, 0); c.stroke();
             c.restore();
         }
 
@@ -251,7 +223,7 @@
             id: 'player', x: WORLD_SIZE/2, y: WORLD_SIZE/2, radius: 30, hp: 150, maxHp: 150,
             color: '#2196f3', name: "Player", speed: 8, angle: 0, isAttacking: false, 
             swingProgress: 0, hitList: new Set(), dashTimer: 0, dashCooldown: 0, dashAngle: 0,
-            kx: 0, ky: 0, xp: 0, totalXp: 0, nextLevel: 100, tier: 1, scale: 1, isPlayer: true, kills: 0, hidden: false, trail: []
+            kx: 0, ky: 0, stunTimer: 0, xp: 0, totalXp: 0, nextLevel: 100, tier: 1, scale: 1, isPlayer: true, kills: 0, hidden: false, trail: []
         };
 
         function spawnBot() {
@@ -260,7 +232,7 @@
                 id: Math.random().toString(36).substr(2, 9), x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE,
                 radius: 30 * (1+(tier-1)*0.35), hp: 100*tier, maxHp: 100*tier, color: '#f44336', name: "Bot",
                 speed: 4.2, angle: Math.random()*Math.PI*2, isAttacking: false, swingProgress: 0, hitList: new Set(), 
-                kx: 0, ky: 0, tier: tier, scale: 1+(tier-1)*0.35, isPlayer: false, totalXp: (tier-1)*100, xp: 0, nextLevel: 100, 
+                kx: 0, ky: 0, stunTimer: 0, tier: tier, scale: 1+(tier-1)*0.35, isPlayer: false, totalXp: (tier-1)*100, xp: 0, nextLevel: 100, 
                 dashTimer: 0, hidden: false, wanderAngle: Math.random()*Math.PI*2, wanderTime: 0, trail: [],
                 swordColor: '#BDC3C7', hiltColor: '#F1C40F', attackCooldown: 0, coins: Math.floor(Math.random() * 250)
             });
@@ -304,43 +276,32 @@
         window.addEventListener('touchmove', (e) => { if (!joyState.active) return; for(let i=0; i<e.changedTouches.length; i++){ if(e.changedTouches[i].identifier === joyState.id){ updateJoy(e.changedTouches[i]); e.preventDefault(); }}}, {passive: false});
         function updateJoy(t){ const r = joyBase.getBoundingClientRect(); const dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2); const dist = Math.min(50, Math.hypot(dx, dy)), a = Math.atan2(dy, dx); joyState.x = (Math.cos(a) * dist) / 50; joyState.y = (Math.sin(a) * dist) / 50; joyStick.style.transform = `translate(${joyState.x * 30}px, ${joyState.y * 30}px)`; }
         window.addEventListener('touchend', (e) => { for(let i=0; i<e.changedTouches.length; i++){ if(e.changedTouches[i].identifier === joyState.id){ joyState.active = false; joyState.x = 0; joyState.y = 0; joyStick.style.transform = 'none'; }}});
-        document.getElementById('atk-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(!player.isAttacking && gameActive) { player.isAttacking = true; player.swingProgress = 0; player.hitList.clear(); }}, {passive: false});
-        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if(player.dashCooldown <= 0 && gameActive) { player.dashTimer = 18; player.dashCooldown = 65; player.dashAngle = player.angle; }}, {passive: false});
+        
+        document.getElementById('atk-btn').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            if(!player.isAttacking && gameActive && player.stunTimer <= 0) { 
+                player.isAttacking = true; player.swingProgress = 0; player.hitList.clear(); 
+            }
+        }, {passive: false});
+        
+        document.getElementById('dash-btn').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            if(player.dashCooldown <= 0 && gameActive && player.stunTimer <= 0) { 
+                player.dashTimer = 18; player.dashCooldown = 65; player.dashAngle = player.angle; 
+            }
+        }, {passive: false});
 
         function resolveCollision(a, b) { if (a.dashTimer > 0 || b.dashTimer > 0) return; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy), min = a.radius + b.radius; if (dist < min && dist > 0) { const overlap = (min - dist) / 2; a.x -= (dx/dist)*overlap; a.y -= (dy/dist)*overlap; b.x += (dx/dist)*overlap; b.y += (dy/dist)*overlap; }}
         
-        function checkStealth(ent) { 
-            ent.hidden = false; 
-            for(let b of bushes) { 
-                for(let p of b.parts) { 
-                    if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.9) { 
-                        ent.hidden = true; return; 
-                    }
-                }
-            }
-        }
+        function checkStealth(ent) { ent.hidden = false; for(let b of bushes) { for(let p of b.parts) { if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.9) { ent.hidden = true; return; }}}}
 
         function drawMinimap() {
             miniCtx.clearRect(0, 0, miniSize, miniSize);
             const scale = miniSize / WORLD_SIZE;
-
-            // Bots as tiny dots
-            bots.forEach(bot => {
-                if (bot.hidden) return;
-                miniCtx.fillStyle = 'rgba(255, 23, 68, 0.8)';
-                miniCtx.fillRect(bot.x * scale, bot.y * scale, 1.2, 1.2);
-            });
-
-            // Player as a visible indicator
-            miniCtx.fillStyle = '#00e676';
-            miniCtx.beginPath();
-            miniCtx.arc(player.x * scale, player.y * scale, 2.5, 0, Math.PI * 2);
-            miniCtx.fill();
-            
-            // Viewport rect
+            bots.forEach(bot => { if (bot.hidden) return; miniCtx.fillStyle = 'rgba(255, 23, 68, 0.8)'; miniCtx.fillRect(bot.x * scale, bot.y * scale, 1.2, 1.2); });
+            miniCtx.fillStyle = '#00e676'; miniCtx.beginPath(); miniCtx.arc(player.x * scale, player.y * scale, 2.5, 0, Math.PI * 2); miniCtx.fill();
             miniCtx.strokeStyle = 'rgba(255,255,255,0.2)';
-            const vw = (w / camera.zoom) * scale;
-            const vh = (h / camera.zoom) * scale;
+            const vw = (w / camera.zoom) * scale, vh = (h / camera.zoom) * scale;
             miniCtx.strokeRect((camera.x * scale) - vw/2, (camera.y * scale) - vh/2, vw, vh);
         }
 
@@ -352,10 +313,11 @@
                 ctx.lineWidth = 20 * e.scale; ctx.lineCap = 'round'; ctx.stroke();
             }
             ctx.save(); ctx.translate(x, y);
+            if(e.hidden) ctx.globalAlpha = e.id === 'player' ? 0.6 : 0.25;
             
-            // High visibility for player in bushes
-            if(e.hidden) {
-                ctx.globalAlpha = e.id === 'player' ? 0.6 : 0.25;
+            // Stun effect (red pulse)
+            if (e.stunTimer > 0) {
+                ctx.shadowBlur = 15; ctx.shadowColor = "rgba(255, 0, 0, 0.8)";
             }
 
             ctx.fillStyle = "white"; ctx.font = `bold ${14 * e.scale}px Arial`; ctx.textAlign = "center";
@@ -380,7 +342,6 @@
             }
 
             renderSword(ctx, pivotX, 0, e.scale, e.angle + swingAngle, e.swordColor, e.hiltColor);
-
             ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fillStyle = e.color; ctx.fill();
             ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.restore();
@@ -395,11 +356,8 @@
             }
 
             if (gameActive && player.hp <= 0) { 
-                gameActive = false; 
-                totalCoins += sessionCoins;
-                localStorage.setItem('sb_coins', totalCoins);
-                document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; 
-                gameOverScreen.style.display = 'flex'; 
+                gameActive = false; totalCoins += sessionCoins; localStorage.setItem('sb_coins', totalCoins);
+                document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; gameOverScreen.style.display = 'flex'; 
             }
 
             const entities = gameActive ? [player, ...bots] : bots;
@@ -409,12 +367,12 @@
                 camera.x += (player.x - camera.x)*0.1; camera.y += (player.y - camera.y)*0.1;
                 let speed = (player.speed - (player.tier*0.05));
                 if (player.dashTimer > 0) {
-                    player.x += Math.cos(player.dashAngle) * 18; player.y += Math.sin(player.dashAngle) * 18;
-                    player.dashTimer--;
-                } else if (joyState.active) { 
+                    player.x += Math.cos(player.dashAngle) * 18; player.y += Math.sin(player.dashAngle) * 18; player.dashTimer--;
+                } else if (joyState.active && player.stunTimer <= 0) { 
                     player.x += joyState.x*speed; player.y += joyState.y*speed; player.angle = Math.atan2(joyState.y, joyState.x); 
                 }
                 player.x += player.kx; player.y += player.ky; player.kx *= 0.85; player.ky *= 0.85;
+                if (player.stunTimer > 0) player.stunTimer--;
                 player.x = Math.max(player.radius, Math.min(WORLD_SIZE-player.radius, player.x));
                 player.y = Math.max(player.radius, Math.min(WORLD_SIZE-player.radius, player.y));
                 if (player.dashCooldown > 0) player.dashCooldown--;
@@ -432,13 +390,16 @@
                         atk.hitList.add(vic.id);
                         const knockAngle = Math.atan2(vic.y - atk.y, vic.x - atk.x);
                         vic.kx = Math.cos(knockAngle) * 22; vic.ky = Math.sin(knockAngle) * 22;
+                        
+                        // Apply Stun on knockback
+                        vic.stunTimer = 25; 
+                        vic.isAttacking = false; vic.swingProgress = 0; vic.trail = [];
+                        
                         addDamageText(vic.x, vic.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
                         if (vic.hp <= 0) { 
                             atk.kills++; atk.xp += 100*vic.tier; 
-                            if(atk.isPlayer) {
-                                kills++; sessionCoins += 50 * vic.tier;
-                                addDamageText(vic.x, vic.y, `+${50*vic.tier} Coins`, "#ffd700");
-                            } else { atk.coins += 50 * vic.tier; }
+                            if(atk.isPlayer) { kills++; sessionCoins += 50 * vic.tier; addDamageText(vic.x, vic.y, `+${50*vic.tier} Coins`, "#ffd700"); }
+                            else { atk.coins += 50 * vic.tier; }
                         }
                     }
                 });
@@ -450,41 +411,37 @@
                 for(let g of xpGems) { let d=Math.hypot(g.x-bot.x, g.y-bot.y); if(d<cMin){ cMin=d; coinTarget=g; }}
                 entities.forEach(e => { if(e!==bot && !e.hidden){ let d=Math.hypot(e.x-bot.x, e.y-bot.y); if(d<dMin){ dMin=d; target=e; }} });
 
-                if (target && dMin < 250*bot.scale) {
-                    bot.angle = Math.atan2(target.y-bot.y, target.x-bot.x);
-                    bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
-                    if (dMin < 150*bot.scale && !bot.isAttacking && bot.attackCooldown <= 0) { 
-                        bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 50; 
+                if (bot.stunTimer <= 0) {
+                    if (target && dMin < 250*bot.scale) {
+                        bot.angle = Math.atan2(target.y-bot.y, target.x-bot.x);
+                        bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
+                        if (dMin < 150*bot.scale && !bot.isAttacking && bot.attackCooldown <= 0) { 
+                            bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 50; 
+                        }
+                    } else if (coinTarget) {
+                        bot.angle = Math.atan2(coinTarget.y-bot.y, coinTarget.x-bot.x);
+                        bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
+                    } else {
+                        if(bot.wanderTime <= 0) { bot.wanderAngle = Math.random() * Math.PI * 2; bot.wanderTime = 60 + Math.random() * 120; }
+                        bot.x += Math.cos(bot.wanderAngle) * (bot.speed * 0.6); bot.y += Math.sin(bot.wanderAngle) * (bot.speed * 0.6);
+                        bot.angle = bot.wanderAngle; bot.wanderTime--;
                     }
-                } else if (coinTarget) {
-                    bot.angle = Math.atan2(coinTarget.y-bot.y, coinTarget.x-bot.x);
-                    bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
-                } else {
-                    if(bot.wanderTime <= 0) { bot.wanderAngle = Math.random() * Math.PI * 2; bot.wanderTime = 60 + Math.random() * 120; }
-                    bot.x += Math.cos(bot.wanderAngle) * (bot.speed * 0.6); bot.y += Math.sin(bot.wanderAngle) * (bot.speed * 0.6);
-                    bot.angle = bot.wanderAngle; bot.wanderTime--;
                 }
                 if (bot.attackCooldown > 0) bot.attackCooldown--;
+                if (bot.stunTimer > 0) bot.stunTimer--;
                 bot.x += bot.kx; bot.y += bot.ky; bot.kx *= 0.85; bot.ky *= 0.85;
                 bot.x = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.x));
                 bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.y));
                 entities.forEach(other => { if(bot !== other) resolveCollision(bot, other); });
-                if (bot.hp <= 0) { 
-                    for(let i=0; i<3; i++) spawnGem(bot.x + (Math.random()-0.5)*100, bot.y + (Math.random()-0.5)*100, 50); 
-                    bots.splice(idx, 1); spawnBot(); 
-                }
+                if (bot.hp <= 0) { for(let i=0; i<3; i++) spawnGem(bot.x + (Math.random()-0.5)*100, bot.y + (Math.random()-0.5)*100, 50); bots.splice(idx, 1); spawnBot(); }
             });
 
             entities.forEach(ent => {
                 for (let i = xpGems.length-1; i >= 0; i--) {
                     if (Math.hypot(ent.x - xpGems[i].x, ent.y - xpGems[i].y) < ent.radius+20) {
-                        if (xpGems[i].isCoin) {
-                            if(ent.isPlayer) sessionCoins += xpGems[i].val; else ent.coins += xpGems[i].val;
-                        } else {
-                            ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val;
-                        }
-                        xpGems.splice(i, 1);
-                        if (xpGems.length < 180) spawnGem();
+                        if (xpGems[i].isCoin) { if(ent.isPlayer) sessionCoins += xpGems[i].val; else ent.coins += xpGems[i].val; }
+                        else { ent.xp += xpGems[i].val; ent.totalXp += xpGems[i].val; }
+                        xpGems.splice(i, 1); if (xpGems.length < 180) spawnGem();
                     }
                 }
                 if (ent.xp >= ent.nextLevel) {
@@ -494,7 +451,6 @@
             });
 
             for (let i = damageTexts.length-1; i >= 0; i--) { damageTexts[i].y += damageTexts[i].vy; damageTexts[i].life -= 0.02; if(damageTexts[i].life <= 0) damageTexts.splice(i, 1); }
-            
             const ranked = [player, ...bots].sort((a,b)=>b.coins - a.coins).slice(0, 5);
             lbList.innerHTML = ranked.map((e,i)=>`<div style="display:flex; justify-content:space-between; ${e.id==='player'?'color:var(--primary);font-weight:900;':''}"><span>${i+1}. ${e.name}</span><span>${Math.floor(e.coins)}</span></div>`).join('');
         }
@@ -504,46 +460,21 @@
             update();
             ctx.save(); ctx.translate(w/2, h/2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE, WORLD_SIZE);
-            
             const time = Date.now() * 0.002;
-            if(currentTheme === themes.lava) {
-                for(let x=0; x<WORLD_SIZE; x+=300) for(let y=0; y<WORLD_SIZE; y+=300) {
-                    ctx.fillStyle = `rgba(255, 69, 0, ${0.08 + Math.sin(time + (x+y)*0.01)*0.04})`; ctx.fillRect(x, y, 220, 220);
-                }
-            } else if(currentTheme === themes.ocean) {
-                for(let x=0; x<WORLD_SIZE; x+=400) for(let y=0; y<WORLD_SIZE; y+=400) {
-                    ctx.fillStyle = `rgba(0, 119, 190, ${0.15 + Math.cos(time*0.5 + x*0.01)*0.08})`;
-                    ctx.beginPath(); ctx.arc(x, y, 160 + Math.sin(time)*30, 0, Math.PI*2); ctx.fill();
-                }
-            } else {
-                ctx.fillStyle = currentTheme.sec;
-                for(let x=0; x<WORLD_SIZE; x+=200) for(let y=0; y<WORLD_SIZE; y+=200) if((x+y)%400 === 0) ctx.fillRect(x, y, 80, 80);
-            }
+            if(currentTheme === themes.lava) { for(let x=0; x<WORLD_SIZE; x+=300) for(let y=0; y<WORLD_SIZE; y+=300) { ctx.fillStyle = `rgba(255, 69, 0, ${0.08 + Math.sin(time + (x+y)*0.01)*0.04})`; ctx.fillRect(x, y, 220, 220); } }
+            else if(currentTheme === themes.ocean) { for(let x=0; x<WORLD_SIZE; x+=400) for(let y=0; y<WORLD_SIZE; y+=400) { ctx.fillStyle = `rgba(0, 119, 190, ${0.15 + Math.cos(time*0.5 + x*0.01)*0.08})`; ctx.beginPath(); ctx.arc(x, y, 160 + Math.sin(time)*30, 0, Math.PI*2); ctx.fill(); } }
+            else { ctx.fillStyle = currentTheme.sec; for(let x=0; x<WORLD_SIZE; x+=200) for(let y=0; y<WORLD_SIZE; y+=200) if((x+y)%400 === 0) ctx.fillRect(x, y, 80, 80); }
             
-            xpGems.forEach(g => { 
-                ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); 
-                ctx.fillStyle = g.isCoin ? "#ffd700" : currentTheme.gem;
-                ctx.fill(); 
-                if(g.isCoin) { ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2; ctx.stroke(); }
-            });
-
+            xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fillStyle = g.isCoin ? "#ffd700" : currentTheme.gem; ctx.fill(); if(g.isCoin) { ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2; ctx.stroke(); } });
             bots.forEach(b => drawBody(b, b.x, b.y));
             if (gameActive && player.hp > 0) {
                 if(player.dashTimer > 0) { ctx.globalAlpha = 0.3; drawBody(player, player.x-Math.cos(player.dashAngle)*40, player.y-Math.sin(player.dashAngle)*40); ctx.globalAlpha = 1; }
                 drawBody(player, player.x, player.y);
             }
-
-            // Varied Bushes
-            ctx.fillStyle = currentTheme.bush; 
-            bushes.forEach(b => b.parts.forEach(p => { 
-                ctx.beginPath(); ctx.arc(b.x+p.ox, b.y+p.oy, p.r, 0, Math.PI*2); 
-                ctx.fill(); 
-            }));
-
+            ctx.fillStyle = currentTheme.bush; bushes.forEach(b => b.parts.forEach(p => { ctx.beginPath(); ctx.arc(b.x+p.ox, b.y+p.oy, p.r, 0, Math.PI*2); ctx.fill(); }));
             damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = d.life; ctx.fillStyle = d.color; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.fillText(d.text, d.x, d.y); ctx.restore(); });
             ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 20; ctx.strokeRect(0,0,WORLD_SIZE, WORLD_SIZE);
             ctx.restore();
-            
             if (gameActive) {
                 document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
@@ -553,8 +484,6 @@
             requestAnimationFrame(draw);
         }
         window.onresize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
-        
-        // Initializing Varied Bushes
         for(let i=0; i<80; i++) {
             let bx = Math.random()*WORLD_SIZE, by = Math.random()*WORLD_SIZE, parts = [];
             let clusterSize = 3 + Math.floor(Math.random() * 8);
