@@ -56,30 +56,24 @@
         button.main-btn { width: 95%; padding: 15px; margin-top: 10px; border-radius: 12px; border: none; font-size: 18px; background: var(--primary); font-weight: bold; cursor: pointer; color: #000; }
 
         #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.6); padding: 15px 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px); display: none; z-index: 1000; }
-        #right-ui { position: absolute; top: 20px; right: 20px; display: none; flex-direction: column; gap: 15px; z-index: 1000; }
+        
+        #right-ui { position: absolute; top: 20px; right: 20px; display: none; flex-direction: column; gap: 10px; z-index: 1000; align-items: flex-end; }
         #leaderboard { width: 150px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; color: white; font-size: 12px; }
         
+        /* Fixed Minimap Styling */
+        #minimap-container { 
+            width: 150px; height: 150px; 
+            background: rgba(0,0,0,0.6); 
+            border: 2px solid rgba(255,255,255,0.2); 
+            border-radius: 12px; overflow: hidden; 
+            backdrop-filter: blur(5px);
+        }
+
         .touch-ctrl { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); display: none; z-index: 1500; align-items: center; justify-content: center; }
         #joystick-base { bottom: 50px; left: 50px; width: 120px; height: 120px; }
         #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; opacity: 0.4; }
         #dash-btn { bottom: 170px; right: 50px; width: 70px; height: 70px; color: white; font-weight: bold; }
         #atk-btn { bottom: 40px; right: 40px; width: 110px; height: 110px; background: rgba(255, 23, 68, 0.3); border-color: rgba(255,23,68,0.5); color: white; font-weight: bold; }
-
-        /* MINIMAP STYLES */
-        #minimap-container {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 150px;
-            height: 150px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            display: none;
-            z-index: 1000;
-            overflow: hidden;
-            backdrop-filter: blur(5px);
-        }
     </style>
 </head>
 <body>
@@ -127,6 +121,7 @@
     </div>
 
     <div id="right-ui">
+        <div id="minimap-container"><canvas id="minimap"></canvas></div>
         <div id="leaderboard"><div id="lb-list"></div></div>
     </div>
 
@@ -134,17 +129,13 @@
     <div id="dash-btn" class="touch-ctrl">DASH</div>
     <div id="atk-btn" class="touch-ctrl">SWING</div>
 
-    <div id="minimap-container">
-        <canvas id="minimap"></canvas>
-    </div>
-
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        // MINIMAP INIT
+        // Minimap setup
         const miniCanvas = document.getElementById('minimap');
         const miniCtx = miniCanvas.getContext('2d');
         const miniSize = 150;
@@ -241,7 +232,6 @@
             resetPlayer();
             menu.style.display = 'none'; uiLayer.style.display = 'block'; rightUI.style.display = 'flex';
             document.querySelectorAll('.touch-ctrl').forEach(el => el.style.display = 'flex');
-            document.getElementById('minimap-container').style.display = 'block'; // Show Minimap
             gameActive = true; menuActive = false;
         };
 
@@ -277,29 +267,28 @@
         function resolveCollision(a, b) { if (a.dashTimer > 0 || b.dashTimer > 0) return; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy), min = a.radius + b.radius; if (dist < min && dist > 0) { const overlap = (min - dist) / 2; a.x -= (dx/dist)*overlap; a.y -= (dy/dist)*overlap; b.x += (dx/dist)*overlap; b.y += (dy/dist)*overlap; }}
         function checkStealth(ent) { ent.hidden = false; for(let b of bushes) { for(let p of b.parts) { if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.8) { ent.hidden = true; return; }}}}
 
-        // DRAW MINIMAP FUNCTION
+        // Fixed Minimap Function
         function drawMinimap() {
             miniCtx.clearRect(0, 0, miniSize, miniSize);
             const scale = miniSize / WORLD_SIZE;
 
-            // Enemies on Minimap
-            bots.forEach(b => {
-                if (b.hidden) return;
+            // Draw Enemies (Small, Fixed Scaling)
+            bots.forEach(bot => {
+                if (bot.hidden) return;
                 miniCtx.fillStyle = '#ff1744';
                 miniCtx.beginPath();
-                miniCtx.arc(b.x * scale, b.y * scale, 2, 0, Math.PI * 2);
+                miniCtx.arc(bot.x * scale, bot.y * scale, 2, 0, Math.PI * 2);
                 miniCtx.fill();
             });
 
-            // Player on Minimap
+            // Draw Player
             miniCtx.fillStyle = '#00e676';
             miniCtx.beginPath();
             miniCtx.arc(player.x * scale, player.y * scale, 3, 0, Math.PI * 2);
             miniCtx.fill();
-
-            // Camera bounds on Minimap (White box)
-            miniCtx.strokeStyle = 'rgba(255,255,255,0.3)';
-            miniCtx.lineWidth = 1;
+            
+            // Camera rectangle (Relative to world)
+            miniCtx.strokeStyle = 'rgba(255,255,255,0.2)';
             const viewW = (w / camera.zoom) * scale;
             const viewH = (h / camera.zoom) * scale;
             miniCtx.strokeRect((camera.x * scale) - viewW/2, (camera.y * scale) - viewH/2, viewW, viewH);
@@ -359,7 +348,6 @@
                 localStorage.setItem('sb_coins', totalCoins);
                 document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; 
                 gameOverScreen.style.display = 'flex'; 
-                document.getElementById('minimap-container').style.display = 'none';
             }
 
             const entities = gameActive ? [player, ...bots] : bots;
@@ -454,8 +442,10 @@
             });
 
             for (let i = damageTexts.length-1; i >= 0; i--) { damageTexts[i].y += damageTexts[i].vy; damageTexts[i].life -= 0.02; if(damageTexts[i].life <= 0) damageTexts.splice(i, 1); }
+            
+            // Fixed Leaderboard (Includes Player)
             const ranked = [player, ...bots].sort((a,b)=>b.totalXp - a.totalXp).slice(0, 5);
-            lbList.innerHTML = ranked.map((e,i)=>`<div style="display:flex; justify-content:space-between; ${e.isPlayer?'color:var(--primary);font-weight:900;':''}"><span>${i+1}. ${e.name}</span><span>${Math.floor(e.totalXp/10)}</span></div>`).join('');
+            lbList.innerHTML = ranked.map((e,i)=>`<div style="display:flex; justify-content:space-between; ${e.id==='player'?'color:var(--primary);font-weight:900;':''}"><span>${i+1}. ${e.name}</span><span>${Math.floor(e.totalXp/10)}</span></div>`).join('');
         }
 
         function draw() {
@@ -500,7 +490,7 @@
                 document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
                 document.getElementById('ingame-coins').innerText = "Coins: " + sessionCoins;
-                drawMinimap(); // Call Minimap Draw
+                drawMinimap();
             }
             requestAnimationFrame(draw);
         }
