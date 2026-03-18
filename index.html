@@ -64,6 +64,22 @@
         #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; opacity: 0.4; }
         #dash-btn { bottom: 170px; right: 50px; width: 70px; height: 70px; color: white; font-weight: bold; }
         #atk-btn { bottom: 40px; right: 40px; width: 110px; height: 110px; background: rgba(255, 23, 68, 0.3); border-color: rgba(255,23,68,0.5); color: white; font-weight: bold; }
+
+        /* MINIMAP STYLES */
+        #minimap-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            display: none;
+            z-index: 1000;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+        }
     </style>
 </head>
 <body>
@@ -118,12 +134,23 @@
     <div id="dash-btn" class="touch-ctrl">DASH</div>
     <div id="atk-btn" class="touch-ctrl">SWING</div>
 
+    <div id="minimap-container">
+        <canvas id="minimap"></canvas>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
+        // MINIMAP INIT
+        const miniCanvas = document.getElementById('minimap');
+        const miniCtx = miniCanvas.getContext('2d');
+        const miniSize = 150;
+        miniCanvas.width = miniSize;
+        miniCanvas.height = miniSize;
+
         const menu = document.getElementById('menu'), gameOverScreen = document.getElementById('game-over'), shopMenu = document.getElementById('shop-menu');
         const uiLayer = document.getElementById('ui'), rightUI = document.getElementById('right-ui'), lbList = document.getElementById('lb-list');
         const joyBase = document.getElementById('joystick-base'), joyStick = document.getElementById('joystick-stick');
@@ -214,6 +241,7 @@
             resetPlayer();
             menu.style.display = 'none'; uiLayer.style.display = 'block'; rightUI.style.display = 'flex';
             document.querySelectorAll('.touch-ctrl').forEach(el => el.style.display = 'flex');
+            document.getElementById('minimap-container').style.display = 'block'; // Show Minimap
             gameActive = true; menuActive = false;
         };
 
@@ -248,6 +276,34 @@
 
         function resolveCollision(a, b) { if (a.dashTimer > 0 || b.dashTimer > 0) return; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy), min = a.radius + b.radius; if (dist < min && dist > 0) { const overlap = (min - dist) / 2; a.x -= (dx/dist)*overlap; a.y -= (dy/dist)*overlap; b.x += (dx/dist)*overlap; b.y += (dy/dist)*overlap; }}
         function checkStealth(ent) { ent.hidden = false; for(let b of bushes) { for(let p of b.parts) { if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.8) { ent.hidden = true; return; }}}}
+
+        // DRAW MINIMAP FUNCTION
+        function drawMinimap() {
+            miniCtx.clearRect(0, 0, miniSize, miniSize);
+            const scale = miniSize / WORLD_SIZE;
+
+            // Enemies on Minimap
+            bots.forEach(b => {
+                if (b.hidden) return;
+                miniCtx.fillStyle = '#ff1744';
+                miniCtx.beginPath();
+                miniCtx.arc(b.x * scale, b.y * scale, 2, 0, Math.PI * 2);
+                miniCtx.fill();
+            });
+
+            // Player on Minimap
+            miniCtx.fillStyle = '#00e676';
+            miniCtx.beginPath();
+            miniCtx.arc(player.x * scale, player.y * scale, 3, 0, Math.PI * 2);
+            miniCtx.fill();
+
+            // Camera bounds on Minimap (White box)
+            miniCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+            miniCtx.lineWidth = 1;
+            const viewW = (w / camera.zoom) * scale;
+            const viewH = (h / camera.zoom) * scale;
+            miniCtx.strokeRect((camera.x * scale) - viewW/2, (camera.y * scale) - viewH/2, viewW, viewH);
+        }
 
         function drawBody(e, x, y) {
             if (e.isAttacking && e.trail.length > 1) {
@@ -303,6 +359,7 @@
                 localStorage.setItem('sb_coins', totalCoins);
                 document.getElementById('final-stats').innerText = `Kills: ${kills} | Tier: ${player.tier}`; 
                 gameOverScreen.style.display = 'flex'; 
+                document.getElementById('minimap-container').style.display = 'none';
             }
 
             const entities = gameActive ? [player, ...bots] : bots;
@@ -443,6 +500,7 @@
                 document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
                 document.getElementById('ingame-coins').innerText = "Coins: " + sessionCoins;
+                drawMinimap(); // Call Minimap Draw
             }
             requestAnimationFrame(draw);
         }
