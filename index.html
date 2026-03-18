@@ -202,18 +202,36 @@
             if(!isPreview) c.translate(x, y);
             c.rotate(angle);
             const scale = s * (isPreview ? 0.8 : 1);
+            
+            // Blade (Centered better on hilt for swing arc)
+            c.fillStyle = bladeCol; 
+            c.strokeStyle = '#000'; 
+            c.lineWidth = 1.5 * scale;
+            c.beginPath();
+            c.moveTo(15 * scale, -11 * scale); 
+            c.lineTo(85 * scale, -6 * scale); 
+            c.lineTo(100 * scale, 0);
+            c.lineTo(85 * scale, 6 * scale); 
+            c.lineTo(15 * scale, 11 * scale); 
+            c.closePath(); 
+            c.fill(); 
+            c.stroke();
+
+            // Hilt guard
+            c.fillStyle = hiltCol; 
+            c.fillRect(10 * scale, -15 * scale, 8 * scale, 30 * scale);
+            c.strokeRect(10 * scale, -15 * scale, 8 * scale, 30 * scale);
+
+            // Grip
+            c.fillStyle = '#5D4037'; 
+            c.fillRect(-10 * scale, -4 * scale, 20 * scale, 8 * scale);
+            c.strokeRect(-10 * scale, -4 * scale, 20 * scale, 8 * scale);
+            
+            // Pommel
             c.fillStyle = hiltCol;
-            c.beginPath(); c.arc(-5 * scale, 0, 6 * scale, 0, Math.PI * 2); c.fill();
-            c.strokeStyle = '#000'; c.lineWidth = 1.5 * scale; c.stroke();
-            c.fillStyle = '#5D4037'; c.fillRect(0, -4 * scale, 15 * scale, 8 * scale);
-            c.strokeRect(0, -4 * scale, 15 * scale, 8 * scale);
-            c.fillStyle = hiltCol; c.fillRect(15 * scale, -15 * scale, 8 * scale, 30 * scale);
-            c.strokeRect(15 * scale, -15 * scale, 8 * scale, 30 * scale);
-            c.fillStyle = bladeCol; c.beginPath();
-            c.moveTo(23 * scale, -11 * scale); c.lineTo(85 * scale, -6 * scale); c.lineTo(100 * scale, 0);
-            c.lineTo(85 * scale, 6 * scale); c.lineTo(23 * scale, 11 * scale); c.closePath(); c.fill(); c.stroke();
-            c.strokeStyle = 'rgba(0,0,0,0.15)'; c.lineWidth = 2 * scale;
-            c.beginPath(); c.moveTo(25 * scale, 0); c.lineTo(80 * scale, 0); c.stroke();
+            c.beginPath(); c.arc(-10 * scale, 0, 6 * scale, 0, Math.PI * 2); c.fill();
+            c.stroke();
+
             c.restore();
         }
 
@@ -289,7 +307,7 @@
             ent.currentBush = null;
             for(let b of bushes) { 
                 for(let p of b.parts) { 
-                    if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.9) { 
+                    if(Math.hypot(ent.x - (b.x + p.ox), ent.y - (b.y + p.oy)) < p.r * 0.95) { 
                         ent.hidden = true; 
                         ent.currentBush = b.id;
                         if(ent.isPlayer) bushOverlay.style.opacity = "1";
@@ -304,7 +322,6 @@
             miniCtx.clearRect(0, 0, miniSize, miniSize);
             const scale = miniSize / WORLD_SIZE;
             bots.forEach(bot => { 
-                // Bots only show on minimap if not hidden, OR if player is in the same bush
                 if (bot.hidden && player.currentBush !== bot.currentBush) return; 
                 miniCtx.fillStyle = 'rgba(255, 23, 68, 0.8)'; 
                 miniCtx.fillRect(bot.x * scale, bot.y * scale, 3, 3); 
@@ -316,38 +333,62 @@
         }
 
         function drawBody(e, x, y) {
-            // Mechanics: Bots in bushes are visible only if you are in the same bush. Player is always visible (faded).
-            let isVisible = true;
-            if (!e.isPlayer && e.hidden && player.currentBush !== e.currentBush) isVisible = false;
+            // Visibility logic: You always see yourself (faded). You see bots in the same bush.
+            let alpha = 1.0;
+            if (e.hidden) {
+                if (e.isPlayer || player.currentBush === e.currentBush) {
+                    alpha = 0.45;
+                } else {
+                    return; // Completely hidden
+                }
+            }
             
-            if (!isVisible) return;
-
             if (e.isAttacking && e.trail.length > 1) {
+                ctx.save();
+                ctx.globalAlpha = alpha * 0.3;
                 ctx.beginPath(); ctx.moveTo(e.trail[0].x, e.trail[0].y);
                 for (let i = 1; i < e.trail.length; i++) ctx.lineTo(e.trail[i].x, e.trail[i].y);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${e.hidden ? (e.isPlayer ? 0.2 : 0.1) : 0.3})`;
-                ctx.lineWidth = 20 * e.scale; ctx.lineCap = 'round'; ctx.stroke();
+                ctx.strokeStyle = "rgba(255,255,255,0.4)";
+                ctx.lineWidth = 25 * e.scale; ctx.lineCap = 'round'; ctx.stroke();
+                ctx.restore();
             }
+
             ctx.save(); ctx.translate(x, y);
-            if(e.hidden) ctx.globalAlpha = 0.55;
+            ctx.globalAlpha = alpha;
+            
             if (e.stunTimer > 0) { ctx.shadowBlur = 15; ctx.shadowColor = "rgba(255, 0, 0, 0.8)"; }
+            
+            // Name and HP
             ctx.fillStyle = "white"; ctx.font = `bold ${14 * e.scale}px Arial`; ctx.textAlign = "center";
             ctx.fillText(e.name, 0, -55 * e.scale);
             const barW = 60 * e.scale;
             ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(-barW/2, -42 * e.scale, barW, 8 * e.scale);
             ctx.fillStyle = e.isPlayer ? '#00e676' : '#ff1744';
             ctx.fillRect(-barW/2, -40 * e.scale, barW * (e.hp/e.maxHp), 4 * e.scale);
-            const pivotX = e.radius * 0.7;
-            let swingAngle = 0.5;
+            
+            // Swing Logic
+            let swingAngle = 0.7;
+            const pivotDist = e.radius * 0.85;
             if (e.isAttacking) {
-                swingAngle = 0.8 - (e.swingProgress * 3.8); e.swingProgress += (0.16 / e.scale); 
+                // Sweeps from -1.5 to +1.5 radians relative to character angle
+                swingAngle = 1.5 - (e.swingProgress * 3.0); 
+                e.swingProgress += (0.16 / e.scale); 
+                
+                // Trail follows blade tip
                 const tipDist = 100 * e.scale;
-                const worldTipX = x + Math.cos(e.angle) * pivotX + Math.cos(e.angle + swingAngle) * tipDist;
-                const worldTipY = y + Math.sin(e.angle) * pivotX + Math.sin(e.angle + swingAngle) * tipDist;
-                e.trail.push({x: worldTipX, y: worldTipY}); if(e.trail.length > 10) e.trail.shift();
+                const worldTipX = x + Math.cos(e.angle + swingAngle) * (pivotDist + tipDist);
+                const worldTipY = y + Math.sin(e.angle + swingAngle) * (pivotDist + tipDist);
+                e.trail.push({x: worldTipX, y: worldTipY}); if(e.trail.length > 8) e.trail.shift();
+                
                 if(e.swingProgress >= 1) { e.isAttacking = false; e.swingProgress = 0; e.hitList.clear(); e.trail = []; }
             }
-            renderSword(ctx, pivotX, 0, e.scale, e.angle + swingAngle, e.swordColor, e.hiltColor);
+
+            // Pivot sword from edge of body
+            const sx = Math.cos(e.angle + swingAngle) * pivotDist;
+            const sy = Math.sin(e.angle + swingAngle) * pivotDist;
+            renderSword(ctx, sx, sy, e.scale, e.angle + swingAngle, e.swordColor, e.hiltColor);
+
+            // Body
             ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fillStyle = e.color; ctx.fill();
             ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.restore();
@@ -387,12 +428,13 @@
                 entities.forEach(vic => {
                     if (atk.id === vic.id || atk.hitList.has(vic.id)) return;
                     const dist = Math.hypot(atk.x-vic.x, atk.y-vic.y);
-                    if (dist < 155 * atk.scale) {
+                    // Hit detection based on radius and tier
+                    if (dist < (145 * atk.scale) + vic.radius) {
                         let dmg = Math.floor(22 * atk.scale); vic.hp -= dmg;
                         atk.hitList.add(vic.id);
                         const knockAngle = Math.atan2(vic.y - atk.y, vic.x - atk.x);
                         vic.kx = Math.cos(knockAngle) * 22; vic.ky = Math.sin(knockAngle) * 22;
-                        vic.stunTimer = 12; // 0.2 seconds
+                        vic.stunTimer = 12; // 0.2s @ 60fps
                         vic.isAttacking = false; vic.swingProgress = 0; vic.trail = [];
                         addDamageText(vic.x, vic.y, dmg, atk.isPlayer ? "#ffeb3b" : "#ff5252");
                         if (vic.hp <= 0) { 
@@ -407,12 +449,12 @@
                 checkStealth(bot);
                 let target = null, dMin = 600, coinTarget = null, cMin = 500;
                 for(let g of xpGems) { let d=Math.hypot(g.x-bot.x, g.y-bot.y); if(d<cMin){ cMin=d; coinTarget=g; }}
-                entities.forEach(e => { if(e!==bot && (!e.hidden || (e.isPlayer && player.currentBush === e.currentBush))){ let d=Math.hypot(e.x-bot.x, e.y-bot.y); if(d<dMin){ dMin=d; target=e; }} });
+                entities.forEach(e => { if(e!==bot && (!e.hidden || player.currentBush === e.currentBush)){ let d=Math.hypot(e.x-bot.x, e.y-bot.y); if(d<dMin){ dMin=d; target=e; }} });
                 if (bot.stunTimer <= 0) {
                     if (target && dMin < 250*bot.scale) {
                         bot.angle = Math.atan2(target.y-bot.y, target.x-bot.x);
                         bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
-                        if (dMin < 150*bot.scale && !bot.isAttacking && bot.attackCooldown <= 0) { bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 50; }
+                        if (dMin < 130*bot.scale && !bot.isAttacking && bot.attackCooldown <= 0) { bot.isAttacking = true; bot.swingProgress = 0; bot.hitList.clear(); bot.attackCooldown = 50; }
                     } else if (coinTarget) {
                         bot.angle = Math.atan2(coinTarget.y-bot.y, coinTarget.x-bot.x);
                         bot.x += Math.cos(bot.angle)*bot.speed; bot.y += Math.sin(bot.angle)*bot.speed;
@@ -428,7 +470,7 @@
                 bot.x = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.x));
                 bot.y = Math.max(bot.radius, Math.min(WORLD_SIZE-bot.radius, bot.y));
                 entities.forEach(other => { if(bot !== other) resolveCollision(bot, other); });
-                if (bot.hp <= 0) { for(let i=0; i<3; i++) spawnGem(bot.x + (Math.random()-0.5)*100, bot.y + (Math.random()-0.5)*100, 50); bots.splice(idx, 1); spawnBot(); }
+                if (bot.hp <= 0) { for(let i=0; i<3; i++) spawnGem(bot.x + (Math.random()-0.5)*100, bot.y + (Math.random()-0.5)*100, 50); bots.splice(idx, 1); if(bots.length < 22) spawnBot(); }
             });
             entities.forEach(ent => {
                 for (let i = xpGems.length-1; i >= 0; i--) {
@@ -440,7 +482,7 @@
                 }
                 if (ent.xp >= ent.nextLevel) {
                     ent.tier++; ent.xp -= ent.nextLevel; ent.nextLevel = Math.floor(ent.nextLevel * 1.8);
-                    ent.scale += 0.25; ent.radius = 30 * ent.scale; ent.maxHp += 40; ent.hp = ent.maxHp;
+                    ent.scale += 0.22; ent.radius = 30 * ent.scale; ent.maxHp += 40; ent.hp = ent.maxHp;
                 }
             });
             for (let i = damageTexts.length-1; i >= 0; i--) { damageTexts[i].y += damageTexts[i].vy; damageTexts[i].life -= 0.02; if(damageTexts[i].life <= 0) damageTexts.splice(i, 1); }
@@ -453,23 +495,30 @@
             update();
             ctx.save(); ctx.translate(w/2, h/2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
             ctx.fillStyle = currentTheme.bg; ctx.fillRect(0,0,WORLD_SIZE, WORLD_SIZE);
+            
             const time = Date.now() * 0.002;
             if(currentTheme === themes.lava) { for(let x=0; x<WORLD_SIZE; x+=300) for(let y=0; y<WORLD_SIZE; y+=300) { ctx.fillStyle = `rgba(255, 69, 0, ${0.08 + Math.sin(time + (x+y)*0.01)*0.04})`; ctx.fillRect(x, y, 220, 220); } }
             else if(currentTheme === themes.ocean) { for(let x=0; x<WORLD_SIZE; x+=400) for(let y=0; y<WORLD_SIZE; y+=400) { ctx.fillStyle = `rgba(0, 119, 190, ${0.15 + Math.cos(time*0.5 + x*0.01)*0.08})`; ctx.beginPath(); ctx.arc(x, y, 160 + Math.sin(time)*30, 0, Math.PI*2); ctx.fill(); } }
             else { ctx.fillStyle = currentTheme.sec; for(let x=0; x<WORLD_SIZE; x+=200) for(let y=0; y<WORLD_SIZE; y+=200) if((x+y)%400 === 0) ctx.fillRect(x, y, 80, 80); }
+            
             xpGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fillStyle = g.isCoin ? "#ffd700" : currentTheme.gem; ctx.fill(); if(g.isCoin) { ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2; ctx.stroke(); } });
+            
             bots.forEach(b => drawBody(b, b.x, b.y));
             if (gameActive && player.hp > 0) {
                 if(player.dashTimer > 0) { ctx.globalAlpha = 0.3; drawBody(player, player.x-Math.cos(player.dashAngle)*40, player.y-Math.sin(player.dashAngle)*40); ctx.globalAlpha = 1; }
                 drawBody(player, player.x, player.y);
             }
+
+            // Draw bushes on TOP of players but they are semi-transparent
             bushes.forEach(b => {
                 ctx.fillStyle = b.type === 1 ? currentTheme.bush : currentTheme.bush2;
                 b.parts.forEach(p => { ctx.beginPath(); ctx.arc(b.x+p.ox, b.y+p.oy, p.r, 0, Math.PI*2); ctx.fill(); });
             });
+
             damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = d.life; ctx.fillStyle = d.color; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.fillText(d.text, d.x, d.y); ctx.restore(); });
             ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 20; ctx.strokeRect(0,0,WORLD_SIZE, WORLD_SIZE);
             ctx.restore();
+            
             if (gameActive) {
                 document.getElementById('xp-display').innerText = `Tier ${player.tier}: ${Math.floor(player.xp)} / ${player.nextLevel}`;
                 document.getElementById('score').innerText = "Kills: " + kills;
@@ -478,6 +527,7 @@
             }
             requestAnimationFrame(draw);
         }
+
         window.onresize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
         for(let i=0; i<85; i++) {
             let bx = Math.random()*WORLD_SIZE, by = Math.random()*WORLD_SIZE, parts = [];
@@ -485,7 +535,7 @@
             for(let p=0; p<clusterSize; p++) parts.push({ ox: (Math.random()-0.5)*250, oy: (Math.random()-0.5)*250, r: 60 + Math.random()*110 });
             bushes.push({ id: i, x: bx, y: by, parts: parts, type: Math.random() > 0.5 ? 1 : 2 });
         }
-        for(let i=0; i<35; i++) spawnBot();
+        for(let i=0; i<22; i++) spawnBot(); // Reduced initial bots
         for(let i=0; i<180; i++) spawnGem();
         draw();
     </script>
